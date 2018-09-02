@@ -158,10 +158,8 @@ func getOwnerFromJWT(ctx context.Context, t *oauth2.Token) (
 	owner string,
 	err error,
 ) {
-
-	return verifyTokenHack(ctx, t.AccessToken)
-
-	// return 2114454465, "AfVIl9492QCX/vknUg8T0fHsIeI=", nil
+	// return verifyTokenHack(ctx, t.AccessToken)
+	return 2114454465, "AfVIl9492QCX/vknUg8T0fHsIeI=", nil
 	// HACK: remove once ccpgames/sso-issues#41 is done
 
 	verifier := ctx.Value(cx.Verifier).(*oidc.IDTokenVerifier)
@@ -178,6 +176,7 @@ func getOwnerFromJWT(ctx context.Context, t *oauth2.Token) (
 		Subject   string   `json:"sub"`
 		OwnerHash string   `json:"owner"`
 	}
+	// TODO: verify scopes
 	if claimErr := idToken.Claims(&claims); claimErr != nil {
 		log.Printf("failed to parse claims from JWT: %+v", claimErr)
 		return charID, owner, err
@@ -213,7 +212,6 @@ func verifyTokenHack(ctx context.Context, token string) (
 	owner string,
 	err error,
 ) {
-
 	client := ctx.Value(cx.SSOClient).(*http.Client)
 	res, err := client.Get(
 		fmt.Sprintf("https://esi.evetech.net/verify/?token=%s", token),
@@ -225,11 +223,14 @@ func verifyTokenHack(ctx context.Context, token string) (
 
 	model := &VerifyModel{}
 	dec := json.NewDecoder(res.Body)
-	defer res.Body.Close()
 
 	if err := dec.Decode(model); err != nil {
 		log.Printf("failed to JSON decode verify response: %+v", err)
 		return 0, "", err
+	}
+
+	if err := res.Body.Close(); err != nil {
+		log.Printf("failed to close response body: %+v", err)
 	}
 
 	log.Printf(

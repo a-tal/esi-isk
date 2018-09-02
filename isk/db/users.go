@@ -24,10 +24,12 @@ func SaveUserCharacter(ctx context.Context, user *UserCharacter) error {
 	prevChar, err := getUserCharacter(ctx, user.CharacterID)
 	if err != nil {
 		// new user
+		log.Println("saving new character")
 		return saveNewUserCharacter(ctx, user)
 	}
 
 	if prevChar != nil && user.OwnerHash == prevChar.OwnerHash {
+		log.Println("updating known character")
 		return updateUserCharacter(ctx, user)
 	}
 
@@ -36,6 +38,7 @@ func SaveUserCharacter(ctx context.Context, user *UserCharacter) error {
 		return err
 	}
 
+	log.Println("deleted old character, saving new character")
 	return saveNewUserCharacter(ctx, user)
 }
 
@@ -71,7 +74,7 @@ func getUserCharacter(
 	ctx context.Context,
 	characterID int32,
 ) (*UserCharacter, error) {
-	res, err := executeNamedResult(
+	res, err := queryNamedResult(
 		ctx,
 		cx.StmtGetUser,
 		map[string]interface{}{"character_id": characterID},

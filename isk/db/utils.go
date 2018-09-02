@@ -42,20 +42,21 @@ func Connect(ctx context.Context) *sqlx.DB {
 	return db
 }
 
-func executeNamed(
-	ctx context.Context,
-	stmt cx.Key,
-	values map[string]interface{},
-) error {
-	_, err := executeNamedResult(ctx, stmt, values)
-	return err
-}
-
-func executeNamedResult(
+func queryNamedResult(
 	ctx context.Context,
 	stmt cx.Key,
 	values map[string]interface{},
 ) (*sqlx.Rows, error) {
 	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
 	return statements[stmt].Queryx(values)
+}
+
+func executeNamed(
+	ctx context.Context,
+	stmt cx.Key,
+	values map[string]interface{},
+) error {
+	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
+	_, err := statements[stmt].Exec(values)
+	return err
 }
