@@ -1,0 +1,12 @@
+div#header > h1 > a,
+div#header > h1 > a:hover,
+div#header > h1 > a:focus {
+  text-decoration: none;
+  color: #343a40 !important;
+}
+
+.github-fork-ribbon:after {
+  line-height: initial !important;
+  padding: initial !important;
+  margin: initial !important;
+}
