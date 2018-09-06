@@ -120,7 +120,7 @@ func Callback(ctx context.Context) http.HandlerFunc {
 			return
 		}
 
-		if err := db.SaveUserCharacter(ctx, user); err != nil {
+		if err := db.SaveUser(ctx, user); err != nil {
 			write(w, 500, []byte("failed to save new user"))
 			return
 		}
@@ -135,13 +135,13 @@ func Callback(ctx context.Context) http.HandlerFunc {
 func userFromToken(
 	ctx context.Context,
 	t *oauth2.Token,
-) (*db.UserCharacter, error) {
+) (*db.User, error) {
 	charID, owner, err := getOwnerFromJWT(ctx, t)
 	if err != nil {
 		return nil, err
 	}
 
-	user := &db.UserCharacter{
+	user := &db.User{
 		CharacterID:   charID,
 		OwnerHash:     owner,
 		RefreshToken:  t.RefreshToken,
@@ -158,8 +158,8 @@ func getOwnerFromJWT(ctx context.Context, t *oauth2.Token) (
 	owner string,
 	err error,
 ) {
-	// return verifyTokenHack(ctx, t.AccessToken)
-	return 2114454465, "AfVIl9492QCX/vknUg8T0fHsIeI=", nil
+	return VerifyTokenHack(ctx, t.AccessToken)
+	// return 2114454465, "AfVIl9492QCX/vknUg8T0fHsIeI=", nil
 	// HACK: remove once ccpgames/sso-issues#41 is done
 
 	verifier := ctx.Value(cx.Verifier).(*oidc.IDTokenVerifier)
@@ -207,7 +207,8 @@ type VerifyModel struct {
 	CharacterOwnerHash string
 }
 
-func verifyTokenHack(ctx context.Context, token string) (
+// VerifyTokenHack pulls the charID and owner hash from the JWT
+func VerifyTokenHack(ctx context.Context, token string) (
 	charID int32,
 	owner string,
 	err error,

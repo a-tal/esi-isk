@@ -84,7 +84,7 @@ func RunServer(ctx context.Context) {
 			Addr:              fmt.Sprintf(":%d", opts.Port),
 			Handler:           middleware,
 			ReadTimeout:       1 * time.Second,
-			WriteTimeout:      1 * time.Second,
+			WriteTimeout:      5 * time.Second,
 			ReadHeaderTimeout: 1 * time.Second,
 			MaxHeaderBytes:    1 << 20,
 		},

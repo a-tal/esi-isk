@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS donations (
     donator        INTEGER          NOT NULL,
     receiver       INTEGER          NOT NULL,
     "timestamp"    TIMESTAMP        NOT NULL,
-    note           VARCHAR(40)      NOT NULL,
+    note           TEXT             NOT NULL,
     amount         DOUBLE PRECISION NOT NULL,
     PRIMARY KEY (transaction_id)
 );

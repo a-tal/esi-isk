@@ -65,7 +65,7 @@ func NewOptions(ctx context.Context) context.Context {
 	https := flag.Bool("https", false, "should be addressed via https")
 	production := flag.Bool("production", false, "if this is being run in prod")
 	authConf := flag.String("auth", "/secret/sso.json", "path to auth config")
-	esi := flag.String("esi", "esi.evetech.net", "basepath for ESI")
+	esi := flag.String("esi", "https://esi.evetech.net", "basepath for ESI")
 
 	flag.Parse()
 

@@ -3,15 +3,16 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a1a8f6bdb2577047454f35688ede4ec22998d3221df239cf8a57cd77f93e5b89"
+  digest = "1:4b1663f30b2eef42f32c3e28aa0e95ff013f277ebb9c8c157738c38026f77aeb"
   name = "github.com/antihax/goesi"
   packages = [
     ".",
     "esi",
+    "meta",
     "optional",
   ]
   pruneopts = "UT"
-  revision = "dd2507d7f199b0a170ed45d77880ba4fe6b6b96b"
+  revision = "2862b9e167c0a8521163ea5b74982dfbe127e9a2"
 
 [[projects]]
   digest = "1:f6e5e1bc64c2908167e6aa9a1fe0c084d515132a1c63ad5b6c84036aa06dc0c1"
@@ -133,7 +134,7 @@
     "pbkdf2",
   ]
   pruneopts = "UT"
-  revision = "182538f80094b6a8efaade63a8fd8e0d9d5843dd"
+  revision = "0709b304e793a5edb4a2c0145f281ecdc20838a4"
 
 [[projects]]
   branch = "master"
@@ -198,6 +199,8 @@
   analyzer-version = 1
   input-imports = [
     "github.com/antihax/goesi",
+    "github.com/antihax/goesi/esi",
+    "github.com/antihax/goesi/optional",
     "github.com/coreos/go-oidc",
     "github.com/gregjones/httpcache",
     "github.com/jmoiron/sqlx",

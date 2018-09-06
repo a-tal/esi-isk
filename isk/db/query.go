@@ -39,13 +39,17 @@ WHERE contract_id = :contract_id`,
 
 		// USERS - user is a character w/ a token
 		cx.StmtCreateUser: `INSERT INTO users (
+    character_id,
     refresh_token,
     access_token,
-    access_expires
+    access_expires,
+    owner_hash
 ) VALUES (
+    :character_id,
     :refresh_token,
     :access_token,
-    :access_expires
+    :access_expires,
+    :owner_hash
 )`,
 
 		cx.StmtGetUser: `SELECT * FROM users WHERE character_id = :character_id`,
@@ -62,10 +66,67 @@ WHERE last_processed IS NULL LIMIT 100`,
     access_expires = :access_expires,
     character_id = :character_id,
     owner_hash = :owner_hash,
+    last_journal_id = :last_journal_id,
+    last_contract_id = :last_contract_id,
     last_processed = NOW()
 WHERE character_id = :character_id`,
 
 		cx.StmtDeleteUser: `DELETE FROM users WHERE character_id = :character_id`,
+
+		cx.StmtAddDonation: `INSERT INTO donations (
+    transaction_id,
+    donator,
+    receiver,
+    "timestamp",
+    note,
+    amount
+) VALUES (
+    :transaction_id,
+    :donator,
+    :receiver,
+    :timestamp,
+    :note,
+    :amount
+)`,
+
+		cx.StmtNewName: `INSERT INTO names (id, name) VALUES (:id, :name)`,
+
+		cx.StmtUpdateName: `UPDATE names SET name = :name WHERE id = :id`,
+
+		cx.StmtGetName: `SELECT (id, name) FROM names WHERE id = :id`,
+
+		cx.StmtCreateCharacter: `INSERT INTO characters (
+      character_id,
+      corporation_id,
+      alliance_id,
+      received,
+      received_isk,
+      donated,
+      donated_isk,
+      last_donated,
+      last_received
+  ) VALUES (
+      :character_id,
+      :corporation_id,
+      :alliance_id,
+      :received,
+      :received_isk,
+      :donated,
+      :donated_isk,
+      :last_donated,
+      :last_received
+  )`,
+
+		cx.StmtUpdateCharacter: `UPDATE characters SET
+      corporation_id = :corporation_id,
+      alliance_id = :alliance_id,
+      received = :received,
+      received_isk = :received_isk,
+      donated = :donated,
+      donated_isk = :donated_isk,
+      last_donated = :last_donated,
+      last_received = :last_received
+  WHERE character_id = :character_id`,
 	}
 
 	for key, query := range queries {
@@ -77,265 +138,4 @@ WHERE character_id = :character_id`,
 	}
 
 	return statements
-}
-
-// CharDetails is the api return for a character
-type CharDetails struct {
-	Character *Character `json:"character"`
-
-	// ISK IN
-	Donations []*Donation `json:"donations,omitempty"`
-	Contracts []*Contract `json:"contracts,omitempty"`
-
-	// ISK OUT
-	Donated    []*Donation `json:"donated,omitempty"`
-	Contracted []*Contract `json:"contracted,omitempty"`
-}
-
-// GetCharDetails returns details for the character from pg
-func GetCharDetails(ctx context.Context, charID int32) (*CharDetails, error) {
-	// hmm
-	char, err := getCharDetails(ctx, charID)
-	if err != nil {
-		return nil, err
-	}
-
-	contracts, err := getCharContracts(ctx, charID)
-	if err != nil {
-		return nil, err
-	}
-
-	contracted, err := getCharContracted(ctx, charID)
-	if err != nil {
-		return nil, err
-	}
-
-	donations, err := getCharDonations(ctx, charID)
-	if err != nil {
-		return nil, err
-	}
-
-	donated, err := getCharDonated(ctx, charID)
-	if err != nil {
-		return nil, err
-	}
-
-	details := &CharDetails{
-		Character:  char,
-		Donations:  donations,
-		Donated:    donated,
-		Contracts:  contracts,
-		Contracted: contracted,
-	}
-
-	log.Printf("character details: %+v", details)
-
-	return details, nil
-}
-
-func getCharContracts(ctx context.Context, charID int32) ([]*Contract, error) {
-	return getContracts(ctx, charID, cx.StmtCharContracts)
-}
-
-func getCharContracted(ctx context.Context, charID int32) ([]*Contract, error) {
-	return getContracts(ctx, charID, cx.StmtCharContracted)
-}
-
-func getCharDonations(ctx context.Context, charID int32) ([]*Donation, error) {
-	return getDonations(ctx, charID, cx.StmtCharDonations)
-}
-
-func getCharDonated(ctx context.Context, charID int32) ([]*Donation, error) {
-	return getDonations(ctx, charID, cx.StmtCharDonated)
-}
-
-func getDonations(ctx context.Context, charID int32, key cx.Key) (
-	[]*Donation,
-	error,
-) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-	r, err := statements[key].Queryx(map[string]interface{}{
-		"character_id": charID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	donations := []*Donation{}
-	defer func() {
-		if err := r.Close(); err != nil {
-			log.Printf("failed to close results: %+v", err)
-		}
-	}()
-
-	for r.Next() {
-		donation := &Donation{}
-		if err := r.StructScan(donation); err != nil {
-			return nil, err
-		}
-		donations = append(donations, donation)
-	}
-
-	return donations, nil
-}
-
-func getContracts(ctx context.Context, charID int32, key cx.Key) (
-	[]*Contract,
-	error,
-) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-	r, err := statements[key].Queryx(map[string]interface{}{
-		"character_id": charID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	contracts := []*Contract{}
-	defer func() {
-		if err := r.Close(); err != nil {
-			log.Printf("failed to close results: %+v", err)
-		}
-	}()
-
-	for r.Next() {
-		contract := &Contract{}
-		if err := r.StructScan(contract); err != nil {
-			return nil, err
-		}
-		contracts = append(contracts, contract)
-	}
-
-	return getContractItems(ctx, contracts)
-}
-
-// getContractItems fills in the Items of each contract passed
-func getContractItems(
-	ctx context.Context,
-	contracts []*Contract,
-) ([]*Contract, error) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-
-	for _, contract := range contracts {
-		r, err := statements[cx.StmtContractItems].Queryx(
-			map[string]interface{}{"contract_id": contract.ID},
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		defer func() {
-			if err := r.Close(); err != nil {
-				log.Printf("failed to close results: %+v", err)
-			}
-		}()
-
-		contract.Items = []Item{}
-
-		for r.Next() {
-			item := Item{}
-			if err := r.StructScan(&item); err != nil {
-				return nil, err
-			}
-			contract.Items = append(contract.Items, item)
-		}
-
-		log.Printf("contract is: %+v", contract)
-	}
-
-	return contracts, nil
-}
-
-func getCharDetails(ctx context.Context, charID int32) (*Character, error) {
-	char := &Character{}
-
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-	r, err := statements[cx.StmtCharDetails].Queryx(
-		map[string]interface{}{"character_id": charID},
-	)
-	if err != nil {
-		log.Printf("failed to pull character details: %+v", err)
-		return nil, err
-	}
-
-	defer func() {
-		if err := r.Close(); err != nil {
-			log.Printf("failed to close results: %+v", err)
-		}
-	}()
-
-	for r.Next() {
-		if err := r.StructScan(char); err != nil {
-			log.Printf("failed to structscan character details: %+v", err)
-			return nil, err
-		}
-		// break
-		// break doesn't matter, there's only one here anyway...
-		// linter complains /shrug
-	}
-
-	return char, nil
-
-}
-
-// GetTopRecipients returns the top character IDs and isk values
-func GetTopRecipients(ctx context.Context) ([]Character, error) {
-	dbChars, err := queryCharISK(ctx, cx.StmtTopReceived)
-	if err != nil {
-		return nil, err
-	}
-	chars := []Character{}
-	for _, char := range dbChars {
-		chars = append(chars, Character{ID: char.id, ReceivedISK: char.isk})
-	}
-	return chars, nil
-}
-
-// GetTopDonators returns the top character IDs and isk values
-func GetTopDonators(ctx context.Context) ([]Character, error) {
-	chars, err := queryCharISK(ctx, cx.StmtTopDonated)
-	if err != nil {
-		return nil, err
-	}
-	characters := []Character{}
-	for _, char := range chars {
-		characters = append(characters, Character{ID: char.id, DonatedISK: char.isk})
-	}
-	return characters, nil
-}
-
-type charISK struct {
-	id  int32
-	isk float64
-}
-
-func queryCharISK(ctx context.Context, q cx.Key) ([]charISK, error) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-
-	res, err := statements[q].Queryx(map[string]interface{}{})
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if err := res.Close(); err != nil {
-			log.Printf("failed to close results: %+v", err)
-		}
-	}()
-
-	return getCharISK(res), nil
-}
-
-func getCharISK(r *sqlx.Rows) []charISK {
-	chars := []charISK{}
-	for r.Next() {
-		var charID int32
-		var totalISK float64
-		if err := r.Scan(&charID, &totalISK); err != nil {
-			log.Printf("failed to scan getCharISK: %+v", err)
-		} else {
-			chars = append(chars, charISK{id: charID, isk: totalISK})
-		}
-	}
-	return chars
 }

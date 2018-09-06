@@ -1,6 +1,13 @@
 package db
 
-import "time"
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/a-tal/esi-isk/isk/cx"
+	"github.com/jmoiron/sqlx"
+)
 
 // Contract describes zero ISK donation contracts
 type Contract struct {
@@ -57,4 +64,79 @@ type Item struct {
 	// TODO
 	// CostPer item in the contract (estimate)
 	// CostPer float64
+}
+
+func getCharContracts(ctx context.Context, charID int32) ([]*Contract, error) {
+	return getContracts(ctx, charID, cx.StmtCharContracts)
+}
+
+func getCharContracted(ctx context.Context, charID int32) ([]*Contract, error) {
+	return getContracts(ctx, charID, cx.StmtCharContracted)
+}
+
+func getContracts(ctx context.Context, charID int32, key cx.Key) (
+	[]*Contract,
+	error,
+) {
+	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
+	r, err := statements[key].Queryx(map[string]interface{}{
+		"character_id": charID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	contracts := []*Contract{}
+	defer func() {
+		if err := r.Close(); err != nil {
+			log.Printf("failed to close results: %+v", err)
+		}
+	}()
+
+	for r.Next() {
+		contract := &Contract{}
+		if err := r.StructScan(contract); err != nil {
+			return nil, err
+		}
+		contracts = append(contracts, contract)
+	}
+
+	return getContractItems(ctx, contracts)
+}
+
+// getContractItems fills in the Items of each contract passed
+func getContractItems(
+	ctx context.Context,
+	contracts []*Contract,
+) ([]*Contract, error) {
+	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
+
+	for _, contract := range contracts {
+		r, err := statements[cx.StmtContractItems].Queryx(
+			map[string]interface{}{"contract_id": contract.ID},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		defer func() {
+			if err := r.Close(); err != nil {
+				log.Printf("failed to close results: %+v", err)
+			}
+		}()
+
+		contract.Items = []Item{}
+
+		for r.Next() {
+			item := Item{}
+			if err := r.StructScan(&item); err != nil {
+				return nil, err
+			}
+			contract.Items = append(contract.Items, item)
+		}
+
+		log.Printf("contract is: %+v", contract)
+	}
+
+	return contracts, nil
 }

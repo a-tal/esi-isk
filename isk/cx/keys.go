@@ -30,6 +30,15 @@ const (
 	// SSOClient is XXX HACK REMOVE ME
 	SSOClient = Key("SSOClient")
 
+	// Client is the goesi client
+	Client = Key("Client")
+
+	// HTTPClient is the http.Client the goesi API Client is using
+	HTTPClient = Key("HTTPClient")
+
+	// Authenticator is the global goesi SSO authenticator
+	Authenticator = Key("Authenticator")
+
 	/* -- API Statements -- */
 
 	// StmtTopReceived pulls the top character_id and receiver totals
@@ -76,4 +85,22 @@ const (
 
 	// StmtDeleteUser deletes a user
 	StmtDeleteUser = Key("StmtDeleteUser")
+
+	// StmtAddDonation inserts a donation into the donations table
+	StmtAddDonation = Key("StmtAddDonation")
+
+	// StmtGetName returns the name for an ID
+	StmtGetName = Key("StmtGetName")
+
+	// StmtNewName creates a new mapping of ID<->name
+	StmtNewName = Key("StmtNewName")
+
+	// StmtUpdateName updates a mapping of ID<->name
+	StmtUpdateName = Key("StmtUpdateName")
+
+	// StmtCreateCharacter creates a new character
+	StmtCreateCharacter = Key("StmtCreateCharacter")
+
+	// StmtUpdateCharacter updates a known character
+	StmtUpdateCharacter = Key("StmtUpdateCharacter")
 )
