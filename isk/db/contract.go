@@ -2,11 +2,9 @@ package db
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/a-tal/esi-isk/isk/cx"
-	"github.com/jmoiron/sqlx"
 )
 
 // Contract describes zero ISK donation contracts
@@ -24,10 +22,10 @@ type Contract struct {
 	Location int64 `db:"location" json:"location"`
 
 	// Issued timestamp
-	Issued *time.Time `db:"issued" json:"issued"`
+	Issued time.Time `db:"issued" json:"issued"`
 
 	// Expires timestamp
-	Expires *time.Time `db:"expires" json:"expires"`
+	Expires time.Time `db:"expires" json:"expires"`
 
 	// Accepted boolean
 	Accepted bool `db:"accepted" json:"accepted"`
@@ -40,7 +38,7 @@ type Contract struct {
 	System int32 `db:"system" json:"system"`
 
 	// Items is an array of items in the contract
-	Items []Item `json:"items"`
+	Items []*Item `json:"items"`
 }
 
 // Item are sourced from the contractItems table by id
@@ -78,27 +76,20 @@ func getContracts(ctx context.Context, charID int32, key cx.Key) (
 	[]*Contract,
 	error,
 ) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-	r, err := statements[key].Queryx(map[string]interface{}{
+	rows, err := queryNamedResult(ctx, key, map[string]interface{}{
 		"character_id": charID,
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	res, err := scan(rows, func() interface{} { return &Contract{} })
+	if err != nil {
+		return nil, err
+	}
 	contracts := []*Contract{}
-	defer func() {
-		if err := r.Close(); err != nil {
-			log.Printf("failed to close results: %+v", err)
-		}
-	}()
-
-	for r.Next() {
-		contract := &Contract{}
-		if err := r.StructScan(contract); err != nil {
-			return nil, err
-		}
-		contracts = append(contracts, contract)
+	for _, i := range res {
+		contracts = append(contracts, i.(*Contract))
 	}
 
 	return getContractItems(ctx, contracts)
@@ -109,33 +100,26 @@ func getContractItems(
 	ctx context.Context,
 	contracts []*Contract,
 ) ([]*Contract, error) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-
 	for _, contract := range contracts {
-		r, err := statements[cx.StmtContractItems].Queryx(
+		rows, err := queryNamedResult(
+			ctx,
+			cx.StmtContractItems,
 			map[string]interface{}{"contract_id": contract.ID},
 		)
+
 		if err != nil {
 			return nil, err
 		}
 
-		defer func() {
-			if err := r.Close(); err != nil {
-				log.Printf("failed to close results: %+v", err)
-			}
-		}()
-
-		contract.Items = []Item{}
-
-		for r.Next() {
-			item := Item{}
-			if err := r.StructScan(&item); err != nil {
-				return nil, err
-			}
-			contract.Items = append(contract.Items, item)
+		res, err := scan(rows, func() interface{} { return &Item{} })
+		if err != nil {
+			return nil, err
 		}
 
-		log.Printf("contract is: %+v", contract)
+		contract.Items = []*Item{}
+		for _, i := range res {
+			contract.Items = append(contract.Items, i.(*Item))
+		}
 	}
 
 	return contracts, nil

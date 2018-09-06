@@ -2,11 +2,9 @@ package db
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/a-tal/esi-isk/isk/cx"
-	"github.com/jmoiron/sqlx"
 )
 
 // Donation describes a one time ISK transfer
@@ -42,29 +40,22 @@ func getDonations(ctx context.Context, charID int32, key cx.Key) (
 	[]*Donation,
 	error,
 ) {
-	statements := ctx.Value(cx.Statements).(map[cx.Key]*sqlx.NamedStmt)
-	r, err := statements[key].Queryx(map[string]interface{}{
+	rows, err := queryNamedResult(ctx, key, map[string]interface{}{
 		"character_id": charID,
 	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	donations := []*Donation{}
-	defer func() {
-		if err := r.Close(); err != nil {
-			log.Printf("failed to close results: %+v", err)
-		}
-	}()
-
-	for r.Next() {
-		donation := &Donation{}
-		if err := r.StructScan(donation); err != nil {
-			return nil, err
-		}
-		donations = append(donations, donation)
+	res, err := scan(rows, func() interface{} { return &Donation{} })
+	if err != nil {
+		return nil, err
 	}
-
+	donations := []*Donation{}
+	for _, i := range res {
+		donations = append(donations, i.(*Donation))
+	}
 	return donations, nil
 }
 

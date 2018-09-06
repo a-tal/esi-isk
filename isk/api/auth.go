@@ -19,12 +19,6 @@ import (
 	"github.com/a-tal/esi-isk/isk/db"
 )
 
-// new login -- create user
-
-// re-login -- lookup user from character_id
-
-// logout
-
 // StateStore stores state uuids we've given out
 type StateStore struct {
 	lock *sync.Mutex
@@ -158,9 +152,8 @@ func getOwnerFromJWT(ctx context.Context, t *oauth2.Token) (
 	owner string,
 	err error,
 ) {
-	return VerifyTokenHack(ctx, t.AccessToken)
-	// return 2114454465, "AfVIl9492QCX/vknUg8T0fHsIeI=", nil
 	// HACK: remove once ccpgames/sso-issues#41 is done
+	return VerifyTokenHack(ctx, t.AccessToken)
 
 	verifier := ctx.Value(cx.Verifier).(*oidc.IDTokenVerifier)
 
@@ -234,10 +227,5 @@ func VerifyTokenHack(ctx context.Context, token string) (
 		log.Printf("failed to close response body: %+v", err)
 	}
 
-	log.Printf(
-		"we get here with char ID %d and owner %s",
-		model.CharacterID,
-		model.CharacterOwnerHash,
-	)
 	return model.CharacterID, model.CharacterOwnerHash, nil
 }

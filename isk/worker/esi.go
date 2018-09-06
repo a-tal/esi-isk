@@ -327,7 +327,7 @@ func getWalletJournal(
 	user *db.User,
 ) (walletDonationEntries, error) {
 	client := ctx.Value(cx.Client).(*goesi.APIClient)
-	entries, res, err := client.ESI.WalletApi.GetCharactersCharacterIdWalletJournal(
+	entries, r, err := client.ESI.WalletApi.GetCharactersCharacterIdWalletJournal(
 		ctx,
 		user.CharacterID,
 		nil,
@@ -337,7 +337,7 @@ func getWalletJournal(
 	}
 
 	if !knownEntry(entries, user) {
-		additional, err := expandWalletJournal(ctx, user, res)
+		additional, err := expandWalletJournal(ctx, user, r)
 		if err != nil {
 			return nil, err
 		}
@@ -361,7 +361,8 @@ func parseForDonations(
 		if hasLastID && entry.Id == lastID {
 			break
 		}
-		if entry.RefType == "player_donation" && entry.SecondPartyId == user.CharacterID {
+		if entry.RefType == "player_donation" &&
+			entry.SecondPartyId == user.CharacterID {
 			donations = append(donations, &db.Donation{
 				ID:        entry.Id,
 				Donator:   entry.FirstPartyId,
@@ -397,9 +398,11 @@ func saveWalletRun(
 
 type walletDonationEntries []esi.GetCharactersCharacterIdWalletJournal200Ok
 
-func (w walletDonationEntries) Len() int           { return len(w) }
-func (w walletDonationEntries) Swap(i, j int)      { w[i], w[j] = w[j], w[i] }
-func (w walletDonationEntries) Less(i, j int) bool { return w[i].Date.Before(w[j].Date) }
+func (w walletDonationEntries) Len() int      { return len(w) }
+func (w walletDonationEntries) Swap(i, j int) { w[i], w[j] = w[j], w[i] }
+func (w walletDonationEntries) Less(i, j int) bool {
+	return w[i].Date.Before(w[j].Date)
+}
 
 func setLastJournalID(entries walletDonationEntries, user *db.User) {
 	if len(entries) < 1 {

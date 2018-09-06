@@ -337,7 +337,7 @@ function donationRow(d, donation) {
   amount.innerHTML = formatISK(d.amount);
 
   let note = document.createElement('td');
-  note.innerHTML = d.note;
+  note.innerHTML = d.note || '';
 
   let timestamp = document.createElement('td');
   timestamp.innerHTML = d.timestamp;

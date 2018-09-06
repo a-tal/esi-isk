@@ -2,10 +2,8 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/a-tal/esi-isk/isk/cx"
-	"github.com/jmoiron/sqlx"
 )
 
 // Name represents an ID -> name mapping
@@ -98,37 +96,10 @@ func GetNames(ctx context.Context, ids ...int32) (map[int32]string, error) {
 }
 
 func getName(ctx context.Context, id int32) (string, error) {
-	res, err := queryNamedResult(
-		ctx,
-		cx.StmtGetName,
-		map[string]interface{}{"id": id},
-	)
-	if err != nil {
+	name := &Name{}
+	values := map[string]interface{}{"id": id}
+	if err := getNamedResult(ctx, cx.StmtGetName, name, values); err != nil {
 		return "", err
 	}
-
-	names, err := scanNames(res)
-	if err != nil {
-		return "", err
-	}
-
-	for _, name := range names {
-		return name.Name, nil
-	}
-
-	return "", fmt.Errorf("name for %d was not found", id)
-}
-
-func scanNames(rows *sqlx.Rows) ([]*Name, error) {
-	names := []*Name{}
-
-	for rows.Next() {
-		name := &Name{}
-		if err := rows.StructScan(name); err != nil {
-			return nil, err
-		}
-		names = append(names, name)
-	}
-
-	return names, nil
+	return name.Name, nil
 }

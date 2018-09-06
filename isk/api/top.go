@@ -23,7 +23,7 @@ func TopRecipients(ctx context.Context) http.HandlerFunc {
 			return
 		}
 
-		res := map[string][]db.Character{
+		res := map[string][]*db.Character{
 			"recipients": recipients,
 			"donators":   donators,
 		}

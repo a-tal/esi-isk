@@ -15,10 +15,12 @@ func GetStatements(ctx context.Context) map[cx.Key]*sqlx.NamedStmt {
 	statements := map[cx.Key]*sqlx.NamedStmt{}
 
 	queries := map[cx.Key]string{
-		cx.StmtTopReceived: `SELECT character_id, received_isk FROM characters
+		cx.StmtTopReceived: `SELECT * FROM characters
 ORDER BY received_isk DESC LIMIT 6`,
-		cx.StmtTopDonated: `SELECT character_id, donated_isk FROM characters
+
+		cx.StmtTopDonated: `SELECT * FROM characters
 ORDER BY donated_isk DESC LIMIT 6`,
+
 		cx.StmtCharDetails: `SELECT * FROM characters
 WHERE character_id = :character_id LIMIT 1`,
 
@@ -35,7 +37,7 @@ WHERE donator = :character_id`,
 WHERE donator = :character_id`,
 
 		cx.StmtContractItems: `SELECT * FROM contractItems
-WHERE contract_id = :contract_id`,
+WHERE contract_id = :contract_id LIMIT 1`,
 
 		// USERS - user is a character w/ a token
 		cx.StmtCreateUser: `INSERT INTO users (
@@ -52,7 +54,8 @@ WHERE contract_id = :contract_id`,
     :owner_hash
 )`,
 
-		cx.StmtGetUser: `SELECT * FROM users WHERE character_id = :character_id`,
+		cx.StmtGetUser: `SELECT * FROM users
+WHERE character_id = :character_id LIMIT 1`,
 
 		cx.StmtGetUsers: `SELECT * FROM users
 WHERE last_processed < NOW() - INTERVAL '1 hour' LIMIT 100`,
@@ -93,7 +96,7 @@ WHERE character_id = :character_id`,
 
 		cx.StmtUpdateName: `UPDATE names SET name = :name WHERE id = :id`,
 
-		cx.StmtGetName: `SELECT (id, name) FROM names WHERE id = :id`,
+		cx.StmtGetName: `SELECT * FROM names WHERE id = :id LIMIT 1`,
 
 		cx.StmtCreateCharacter: `INSERT INTO characters (
       character_id,

@@ -125,16 +125,14 @@ func getUser(
 }
 
 func scanUsers(rows *sqlx.Rows) ([]*User, error) {
-	users := []*User{}
-
-	for rows.Next() {
-		user := &User{}
-		if err := rows.StructScan(user); err != nil {
-			return nil, err
-		}
-		users = append(users, user)
+	res, err := scan(rows, func() interface{} { return &User{} })
+	if err != nil {
+		return nil, err
 	}
-
+	users := []*User{}
+	for _, i := range res {
+		users = append(users, i.(*User))
+	}
 	return users, nil
 }
 

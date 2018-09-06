@@ -16,3 +16,6 @@ secret/sso.json
 bin
 node_modules
 vendor
+public/main.js
+public/*.bundle.js
+public/style.css*
