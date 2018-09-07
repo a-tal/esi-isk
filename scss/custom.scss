@@ -13,3 +13,7 @@ a:hover, a:focus {
   padding: initial !important;
   margin: initial !important;
 }
+
+.contract-expanded, .contract-collapsed {
+  cursor: pointer;
+}

@@ -99,37 +99,73 @@ WHERE character_id = :character_id`,
 		cx.StmtGetName: `SELECT * FROM names WHERE id = :id LIMIT 1`,
 
 		cx.StmtCreateCharacter: `INSERT INTO characters (
-      character_id,
-      corporation_id,
-      alliance_id,
-      received,
-      received_isk,
-      donated,
-      donated_isk,
-      last_donated,
-      last_received
-  ) VALUES (
-      :character_id,
-      :corporation_id,
-      :alliance_id,
-      :received,
-      :received_isk,
-      :donated,
-      :donated_isk,
-      :last_donated,
-      :last_received
-  )`,
+    character_id,
+    corporation_id,
+    alliance_id,
+    received,
+    received_isk,
+    donated,
+    donated_isk,
+    last_donated,
+    last_received
+) VALUES (
+    :character_id,
+    :corporation_id,
+    :alliance_id,
+    :received,
+    :received_isk,
+    :donated,
+    :donated_isk,
+    :last_donated,
+    :last_received
+)`,
 
 		cx.StmtUpdateCharacter: `UPDATE characters SET
-      corporation_id = :corporation_id,
-      alliance_id = :alliance_id,
-      received = :received,
-      received_isk = :received_isk,
-      donated = :donated,
-      donated_isk = :donated_isk,
-      last_donated = :last_donated,
-      last_received = :last_received
-  WHERE character_id = :character_id`,
+    corporation_id = :corporation_id,
+    alliance_id = :alliance_id,
+    received = :received,
+    received_isk = :received_isk,
+    donated = :donated,
+    donated_isk = :donated_isk,
+    last_donated = :last_donated,
+    last_received = :last_received
+WHERE character_id = :character_id`,
+
+		cx.StmtAddContract: `INSERT INTO contracts (
+    contract_id,
+    donator,
+    receiver,
+    location,
+    issued,
+    expires,
+    accepted,
+    value,
+    note
+) VALUES (
+    :contract_id,
+    :donator,
+    :receiver,
+    :location,
+    :issued,
+    :expires,
+    :accepted,
+    :value,
+    :note
+)`,
+
+		cx.StmtAddContractItems: `INSERT INTO contractItems (
+    id,
+    contract_id,
+    type_id,
+    item_id,
+    quantity
+) VALUES (
+    :id,
+    :contract_id,
+    :type_id,
+    :item_id,
+    :quantity
+)`,
 	}
 
 	for key, query := range queries {

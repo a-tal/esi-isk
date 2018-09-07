@@ -150,8 +150,8 @@ func getAffiliation(charID int32, affiliations []*Affiliation) *Affiliation {
 	panic(fmt.Errorf("no affiliation found for character %d", charID))
 }
 
-// SaveCharacters updates all totals in the characters table
-func SaveCharacters(
+// SaveCharacterDonations updates all totals in the characters table
+func SaveCharacterDonations(
 	ctx context.Context,
 	donations []*Donation,
 	affiliations []*Affiliation,
@@ -176,6 +176,37 @@ func SaveCharacters(
 		}
 
 		addToTotals(donation, newCharacters, updatedCharacters)
+	}
+
+	return saveCharacters(ctx, newCharacters, updatedCharacters)
+}
+
+// SaveCharacterContracts updates all totals in the characters table
+func SaveCharacterContracts(
+	ctx context.Context,
+	donations []*Contract,
+	affiliations []*Affiliation,
+) error {
+	newCharacters := []*CharacterRow{}
+	updatedCharacters := []*CharacterRow{}
+	allCharacters := []int32{}
+
+	for _, contract := range donations {
+		for _, charID := range []int32{contract.Donator, contract.Receiver} {
+			if inInt32(charID, allCharacters) {
+				continue
+			}
+			allCharacters = append(allCharacters, charID)
+
+			char, new := bindAffiliation(ctx, charID, affiliations)
+			if new {
+				newCharacters = append(newCharacters, char)
+			} else {
+				updatedCharacters = append(updatedCharacters, char)
+			}
+		}
+
+		addToContractTotals(contract, newCharacters, updatedCharacters)
 	}
 
 	return saveCharacters(ctx, newCharacters, updatedCharacters)
@@ -257,7 +288,6 @@ func addToTotals(donation *Donation, characters ...[]*CharacterRow) {
 			}
 		}
 	}
-
 }
 
 // newCharacter adds a new character to the characters table

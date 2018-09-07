@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/a-tal/esi-isk/isk/cx"
+	"github.com/lib/pq"
 )
 
 // Contract describes zero ISK donation contracts
@@ -20,6 +21,7 @@ type Contract struct {
 
 	// Location is the station or structure ID
 	Location int64 `db:"location" json:"location"`
+	// TODO: resolve locationID to a name (or system name)
 
 	// Issued timestamp
 	Issued time.Time `db:"issued" json:"issued"`
@@ -30,12 +32,11 @@ type Contract struct {
 	// Accepted boolean
 	Accepted bool `db:"accepted" json:"accepted"`
 
-	// TODO
-	// LocationName is the resolved location name
-	// LocationName string
+	// Value is an estimated value of the contract items
+	Value float64 `db:"value" json:"value"`
 
-	// System is the solar system ID
-	System int32 `db:"system" json:"system"`
+	// Note is the title of the contract
+	Note string `db:"note" json:"note"`
 
 	// Items is an array of items in the contract
 	Items []*Item `json:"items"`
@@ -43,25 +44,20 @@ type Contract struct {
 
 // Item are sourced from the contractItems table by id
 type Item struct {
-	// ID is an auto-incrementing ID
-	// not sure if serial type is 32 or 64b
-	ID int64 `db:"id" json:"id"`
+	// ID is a record ID
+	ID int64 `db:"id" json:"-"`
 
 	// ContractID links this item to a contract
-	ContractID int32 `db:"contract_id" json:"contract_id"`
+	ContractID int32 `db:"contract_id" json:"-"`
 
 	// TypeID of the item in the contract
 	TypeID int32 `db:"type_id" json:"type_id"`
 
+	// Quantity of items given
+	Quantity int32 `db:"quantity" json:"quantity"`
+
 	// ItemID of the item in the contract (if possible to determine)
 	ItemID int64 `db:"item_id" json:"item_id,omitempty"`
-
-	// Quantity of items given
-	Quantity int64 `db:"quantity" json:"quantity"`
-
-	// TODO
-	// CostPer item in the contract (estimate)
-	// CostPer float64
 }
 
 func getCharContracts(ctx context.Context, charID int32) ([]*Contract, error) {
@@ -123,4 +119,64 @@ func getContractItems(
 	}
 
 	return contracts, nil
+}
+
+// SaveContract saves the contract and associated items in the db
+func SaveContract(ctx context.Context, contract *Contract) error {
+	err := executeNamed(ctx, cx.StmtAddContract, map[string]interface{}{
+		"contract_id": contract.ID,
+		"donator":     contract.Donator,
+		"receiver":    contract.Receiver,
+		"location":    contract.Location,
+		"issued":      contract.Issued,
+		"expires":     contract.Expires,
+		"accepted":    contract.Accepted,
+		"value":       contract.Value,
+		"note":        contract.Note,
+	})
+	if err != nil {
+		return err
+	}
+	return saveContractItems(ctx, contract.Items)
+}
+
+func saveContractItems(ctx context.Context, items []*Item) error {
+	for _, item := range items {
+		err := executeNamed(ctx, cx.StmtAddContractItems, map[string]interface{}{
+			"id":          item.ID,
+			"contract_id": item.ContractID,
+			"type_id":     item.TypeID,
+			"item_id":     0, // XXX replace once item IDs are in all contract endpoints
+			"quantity":    item.Quantity,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// addToContractTotals adds donation/received totals from contracts
+func addToContractTotals(contract *Contract, characters ...[]*CharacterRow) {
+	for _, chars := range characters {
+		for _, char := range chars {
+			if char.ID == contract.Donator {
+				char.DonatedISK += contract.Value
+				char.Donated++
+				if !char.LastDonated.Valid || char.LastDonated.Time.Before(
+					contract.Issued) {
+					char.LastDonated = pq.NullTime{Time: contract.Issued, Valid: true}
+					char.LastDonated.Valid = true
+				}
+			} else if char.ID == contract.Receiver {
+				char.ReceivedISK += contract.Value
+				char.Received++
+				if !char.LastReceived.Valid || char.LastReceived.Time.Before(
+					contract.Issued) {
+					char.LastReceived = pq.NullTime{Time: contract.Issued, Valid: true}
+					char.LastReceived.Valid = true
+				}
+			}
+		}
+	}
 }

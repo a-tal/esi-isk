@@ -103,4 +103,10 @@ const (
 
 	// StmtUpdateCharacter updates a known character
 	StmtUpdateCharacter = Key("StmtUpdateCharacter")
+
+	// StmtAddContract creates a new contract
+	StmtAddContract = Key("StmtAddContract")
+
+	// StmtAddContractItems creates a new contract item row
+	StmtAddContractItems = Key("StmtAddContractItems")
 )

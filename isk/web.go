@@ -68,7 +68,7 @@ func RunServer(ctx context.Context) {
 			AllowedOrigins:         allowed,
 			AllowCredentials:       true,
 			AllowOriginRequestFunc: nil,
-			Debug:                  opts.Debug,
+			Debug: opts.Debug,
 		}),
 
 		gzip.Gzip(gzip.DefaultCompression),

@@ -3,6 +3,7 @@ import(/* webpackPreload: true */ 'bootstrap');
 import(/* webpackPreload: true */ 'bootstrap/dist/css/bootstrap.min.css');
 import(/* webpackPreload: true */ 'github-fork-ribbon-css/gh-fork-ribbon.css');
 
+import { pad } from './utils';
 
 function header() {
   let title = document.createElement('h1');
@@ -79,7 +80,7 @@ function getTop() {
   jQuery.ajax({
     url: "/api/top",
     success: function(t) {
-      for (i = 0; i < t.donators.length; i++) {
+      for (let i = 0; i < t.donators.length; i++) {
         donators.appendChild(characterDiv(
          t.donators[i].id,
          t.donators[i].name,
@@ -87,7 +88,7 @@ function getTop() {
        ))
       }
 
-      for (i = 0; i < t.recipients.length; i++) {
+      for (let i = 0; i < t.recipients.length; i++) {
         recipients.appendChild(characterDiv(
           t.recipients[i].id,
           t.recipients[i].name,
@@ -132,7 +133,7 @@ function characterDiv(charID, charName, isk) {
 // returns the cleared body div
 function clearBodyDiv() {
   let body = document.getElementById('body');
-  for (i = 0; i <= body.children.length; i++) {
+  for (let i = 0; i <= body.children.length; i++) {
     body.children[0].remove();
   }
   return body;
@@ -159,31 +160,34 @@ function frontPage() {
   return body;
 }
 
+function createTable() {
+  let table = document.createElement('table');
+  table.classList.add('table');
+  table.classList.add('table-hover');
+  table.classList.add('table-sm');
+  return table;
+}
+
+function createTableHeader(content) {
+  let th = document.createElement('th');
+  th.classList.add('text-center');
+  th.innerHTML = content;
+  return th;
+}
+
+
 // donations in
 function donationsTable() {
-  let table = document.createElement('table');
+  let table = createTable();
   table.id = "donations";
-  table.classList.add("table");
 
   let header = document.createElement('thead');
   let headerRow = document.createElement('tr');
 
-  let donator = document.createElement('th');
-  donator.innerHTML = "Donator";
-
-  let amount = document.createElement('th');
-  amount.innerHTML = "Amount";
-
-  let note = document.createElement('th');
-  note.innerHTML = "Note";
-
-  let timestamp = document.createElement('th');
-  timestamp.innerHTML = "Timestamp";
-
-  headerRow.appendChild(donator);
-  headerRow.appendChild(amount);
-  headerRow.appendChild(note);
-  headerRow.appendChild(timestamp);
+  headerRow.appendChild(createTableHeader("Donator"));
+  headerRow.appendChild(createTableHeader("Amount"));
+  headerRow.appendChild(createTableHeader("Note"));
+  headerRow.appendChild(createTableHeader("Timestamp"));
 
   header.appendChild(headerRow);
   table.appendChild(header);
@@ -196,29 +200,16 @@ function donationsTable() {
 
 // donations out
 function donatedTable() {
-  let table = document.createElement('table');
+  let table = createTable();
   table.id = "donations";
-  table.classList.add("table");
 
   let header = document.createElement('thead');
   let headerRow = document.createElement('tr');
 
-  let receiver = document.createElement('th');
-  receiver.innerHTML = "Receiver";
-
-  let amount = document.createElement('th');
-  amount.innerHTML = "Amount";
-
-  let note = document.createElement('th');
-  note.innerHTML = "Note";
-
-  let timestamp = document.createElement('th');
-  timestamp.innerHTML = "Timestamp";
-
-  headerRow.appendChild(receiver);
-  headerRow.appendChild(amount);
-  headerRow.appendChild(note);
-  headerRow.appendChild(timestamp);
+  headerRow.appendChild(createTableHeader("Receiver"));
+  headerRow.appendChild(createTableHeader("Amount"));
+  headerRow.appendChild(createTableHeader("Note"));
+  headerRow.appendChild(createTableHeader("Timestamp"));
 
   header.appendChild(headerRow);
   table.appendChild(header);
@@ -231,39 +222,21 @@ function donatedTable() {
 
 // contracts in
 function contractsTable() {
-  let table = document.createElement('table');
+  let table = createTable()
   table.id = "contracts";
-  table.classList.add("table");
 
   let header = document.createElement('thead');
   let headerRow = document.createElement('tr');
 
-  let donator = document.createElement('th');
-  donator.innerHTML = "Donator";
-
-  let location = document.createElement('th');
-  location.innerHTML = "Location";
-
-  let system = document.createElement('th');
-  system.innerHTML = "System";
-
-  let accepted = document.createElement('th');
-  accepted.innerHTML = "Accepted";
-
-  let issued = document.createElement('th');
-  issued.innerHTML = "Issued";
-
-  let expired = document.createElement('th');
-  expired.innerHTML = "Expired";
-
   // XXX ADD CONTRACT ITEMS -- NESTED ON CLICK IDEALLY
 
-  headerRow.appendChild(donator);
-  headerRow.appendChild(location);
-  headerRow.appendChild(system);
-  headerRow.appendChild(accepted);
-  headerRow.appendChild(issued);
-  headerRow.appendChild(expired);
+  headerRow.appendChild(createTableHeader("Donator"));
+  headerRow.appendChild(createTableHeader("Value"));
+  headerRow.appendChild(createTableHeader("Note"));
+  headerRow.appendChild(createTableHeader("Location"));
+  headerRow.appendChild(createTableHeader("Accepted"));
+  headerRow.appendChild(createTableHeader("Issued"));
+  headerRow.appendChild(createTableHeader("Expires"));
 
   header.appendChild(headerRow);
   table.appendChild(header);
@@ -275,39 +248,21 @@ function contractsTable() {
 }
 
 function contractedTable() {
-  let table = document.createElement('table');
+  let table = createTable();
   table.id = "contracts";
-  table.classList.add("table");
 
   let header = document.createElement('thead');
   let headerRow = document.createElement('tr');
 
-  let receiver = document.createElement('th');
-  receiver.innerHTML = "Receiver";
-
-  let location = document.createElement('th');
-  location.innerHTML = "Location";
-
-  let system = document.createElement('th');
-  system.innerHTML = "System";
-
-  let accepted = document.createElement('th');
-  accepted.innerHTML = "Accepted";
-
-  let issued = document.createElement('th');
-  issued.innerHTML = "Issued";
-
-  let expired = document.createElement('th');
-  expired.innerHTML = "Expired";
-
   // XXX ADD CONTRACT ITEMS -- NESTED ON CLICK IDEALLY
 
-  headerRow.appendChild(receiver);
-  headerRow.appendChild(location);
-  headerRow.appendChild(system);
-  headerRow.appendChild(accepted);
-  headerRow.appendChild(issued);
-  headerRow.appendChild(expired);
+  headerRow.appendChild(createTableHeader("Receiver"));
+  headerRow.appendChild(createTableHeader("Value"));
+  headerRow.appendChild(createTableHeader("Note"));
+  headerRow.appendChild(createTableHeader("Location"));
+  headerRow.appendChild(createTableHeader("Accepted"));
+  headerRow.appendChild(createTableHeader("Issued"));
+  headerRow.appendChild(createTableHeader("Expires"));
 
   header.appendChild(headerRow);
   table.appendChild(header);
@@ -318,10 +273,29 @@ function contractedTable() {
   return table;
 }
 
+function dayRow(dt, colSpan) {
+  let row = document.createElement('tr');
+  let day = createTD(dt.toDateString());
+  day.classList.add('table-active');
+  day.colSpan = colSpan;
+  row.appendChild(day);
+  return row;
+}
+
+function createTD(content='', centered=true) {
+  let td = document.createElement('td');
+  td.classList.add('align-middle');
+  if (centered) {
+    td.classList.add('text-center');
+  }
+  td.innerHTML = content;
+  return td;
+}
+
 function donationRow(d, donation) {
   let row = document.createElement('tr');
 
-  let contact = document.createElement('td');
+  let contact = createTD();
   let contactLink = document.createElement('a');
   contact.appendChild(contactLink);
 
@@ -333,27 +307,18 @@ function donationRow(d, donation) {
     contactLink.appendChild(smallCharacterImage(d.receiver));
   }
 
-  let amount = document.createElement('td');
-  amount.innerHTML = formatISK(d.amount);
-
-  let note = document.createElement('td');
-  note.innerHTML = d.note || '';
-
-  let timestamp = document.createElement('td');
-  timestamp.innerHTML = d.timestamp;
+  let ts = new Date(d.timestamp);
 
   row.appendChild(contact);
-  row.appendChild(amount);
-  row.appendChild(note);
-  row.appendChild(timestamp);
+  row.appendChild(createTD(formatISK(d.amount)));
+  row.appendChild(createTD(d.note || '', false));
+  row.appendChild(createTD(pad(ts.getUTCHours(), 2) + ':' + pad(ts.getUTCMinutes(), 2) + ':' + pad(ts.getUTCSeconds(), 2)));
 
   return row;
 }
 
 function contractRow(d, donation) {
-  let row = document.createElement('tr');
-
-  let contact = document.createElement('td');
+  let contact = createTD();
   let contactLink = document.createElement('a');
   contact.appendChild(contactLink);
 
@@ -365,29 +330,67 @@ function contractRow(d, donation) {
     contactLink.appendChild(smallCharacterImage(d.receiver));
   }
 
-  let location = document.createElement('td');
-  location.innerHTML = d.location;
+  let row = document.createElement('tr');
 
-  let system = document.createElement('td');
-  system.innerHTML = d.system;
-
-  let accepted = document.createElement('td');
-  accepted.innerHTML = d.accepted;
-
-  let issued = document.createElement('td');
-  issued.innerHTML = d.issued;
-
-  let expires = document.createElement('td');
-  expires.innerHTML = d.expires;
+  let ts = new Date(d.issued);
 
   row.appendChild(contact);
-  row.appendChild(location);
-  row.appendChild(system);
-  row.appendChild(accepted);
-  row.appendChild(issued);
-  row.appendChild(expires);
+  row.appendChild(createTD(formatISK(d.value)));
+  row.appendChild(createTD(d.note));
+  row.appendChild(createTD(d.location));
+  row.appendChild(createTD(d.accepted));
+  row.appendChild(createTD(pad(ts.getUTCHours(), 2) + ':' + pad(ts.getUTCMinutes(), 2) + ':' + pad(ts.getUTCSeconds(), 2)));
+  row.appendChild(createTD(d.expires));
 
-  return row;
+  row.classList.add('contract-collapsed');
+  // XXX if this could work that'd be neat
+  // row.setAttribute('data-toggle', 'tooltip');
+  row.title = 'click to expand/collapse';
+  return row
+}
+
+function contractItems(d) {
+  let itemsTable = createTable();
+  itemsTable.classList.add("d-none");
+
+  let header = document.createElement('thead');
+  let headerRow = document.createElement('tr');
+  headerRow.classList.add('table-active');
+
+  headerRow.appendChild(createTableHeader("Item"));
+  headerRow.appendChild(createTableHeader("Quantity"));
+
+  header.appendChild(headerRow);
+  itemsTable.appendChild(header);
+
+  let body = document.createElement('tbody');
+  itemsTable.appendChild(body);
+
+  for (let i = 0; i < d.items.length; i++) {
+    let itemRow = document.createElement('tr');
+    let itemImg = document.createElement('img');
+
+    itemImg.height = 50;
+    itemImg.width = 50;
+    itemImg.alt = d.items[i].type_id.toString();
+    itemImg.classList.add('rounded');
+    itemImg.src = 'https://imageserver.eveonline.com/Type/' + d.items[i].type_id + '_64.png';
+
+    let itemTD = createTD();
+    itemTD.appendChild(itemImg);
+    itemRow.appendChild(itemTD);
+    itemRow.appendChild(createTD(d.items[i].quantity));
+
+    body.appendChild(itemRow);
+  }
+
+  let itemsTR = document.createElement('tr');
+  let itemsTD = document.createElement('td');
+  itemsTD.colSpan = 7;
+  itemsTD.appendChild(itemsTable);
+  itemsTR.appendChild(itemsTD);
+
+  return itemsTR;
 }
 
 function formatISK(n) {
@@ -399,11 +402,11 @@ function formatISK(n) {
 
 function largeCharacterImage(charID, charName, imgType, imgExtn) {
   let charImg = document.createElement('img');
-  charImg.height = 150;
-  charImg.width = 150;
+  charImg.height = 128;
+  charImg.width = 128;
   charImg.alt = charID.toString();
   charImg.classList.add('rounded');
-  charImg.src = 'https://imageserver.eveonline.com/' + (imgType || 'Character') + '/' + charID + '_256.' + (imgExtn || 'jpg');
+  charImg.src = 'https://imageserver.eveonline.com/' + (imgType || 'Character') + '/' + charID + '_128.' + (imgExtn || 'jpg');
 
   let charDiv = document.createElement('div');
   let charNameP = document.createElement('p');
@@ -479,37 +482,31 @@ function characterViewDiv(charID) {
       corpImg.classList.add('col-2');
       character.appendChild(corpImg);
 
-      if (t.donations != undefined) {
-        details.appendChild(h3title("donations"));
-        details.appendChild(donations);
-        for (i=0; i < t.donations.length; i++) {
-          donations.tBodies[0].appendChild(donationRow(t.donations[i], true));
-        }
+      if (t.character.alliance != undefined) {
+        let alianceImg = largeCharacterImage(
+          t.character.alliance,
+          t.character.alliance_name,
+          'Alliance',
+          'png',
+        );
+        alianceImg.classList.add('col-2');
+        character.appendChild(alianceImg);
       }
 
       if (t.contracts != undefined) {
-        details.appendChild(h3title("contracts"));
-        details.appendChild(contracts);
-        for (i=0; i < t.contracts.length; i++) {
-          contracts.tBodies[0].appendChild(contractRow(t.contracts[i], true));
-        }
+        displayTable(details, contracts, "contracts", t.contracts, contractRow, true, 7)
       }
 
-      if (t.donated != undefined) {
-
-        details.appendChild(h3title("donated"));
-        details.appendChild(donated);
-        for (i=0; i < t.donated.length; i++) {
-          donated.tBodies[0].appendChild(donationRow(t.donated[i], false));
-        }
+      if (t.donations != undefined) {
+        displayTable(details, donations, "donations", t.donations, donationRow, true)
       }
 
       if (t.contracted != undefined) {
-        details.appendChild(h3title("contracted"));
-        details.appendChild(contracted);
-        for (i=0; i < t.contracted.length; i++) {
-          contracted.tBodies[0].appendChild(contractRow(t.contracted[i], false));
-        }
+        displayTable(details, contracted, "contracted", t.contracted, contractRow, false, 7)
+      }
+
+      if (t.donated != undefined) {
+        displayTable(details, donated, "donated", t.donated, donationRow, false)
       }
 
     },
@@ -517,6 +514,25 @@ function characterViewDiv(charID) {
   });
 
   return details;
+}
+
+function displayTable(details, parent, title, array, genFunc, donation, colSpan=4) {
+  details.appendChild(h3title(title));
+  details.appendChild(parent);
+  let day = 0;
+
+  for (let i=array.length-1; i >= 0; i--) {
+    let thisDay = new Date(array[i].timestamp || array[i].issued);
+    if (thisDay.getUTCDate() != day) {
+      day = thisDay.getUTCDate();
+      parent.tBodies[0].appendChild(dayRow(thisDay, colSpan));
+    }
+    parent.tBodies[0].appendChild(genFunc(array[i], donation));
+    // XXX HACKHACKHACKHACKHACKHACKHACK XXX
+    if (colSpan != 4) {
+      parent.tBodies[0].appendChild(contractItems(array[i]));
+    }
+  }
 }
 
 function footer() {
@@ -554,7 +570,33 @@ function content() {
   return container;
 }
 
-document.body.removeChild(document.getElementById("nojs"));
-document.body.appendChild(content());
-window.c = switchCharacterView;
-window.m = switchToMainPage;
+jQuery(function($){
+  document.body.removeChild(document.getElementById("nojs"));
+  document.body.appendChild(content());
+  window.c = switchCharacterView;
+  window.m = switchToMainPage;
+
+  $(document).on("click", ".contract-collapsed", function(e) {
+    let target = e.target;
+    while (target.tagName != "TR") {
+      target = target.parentElement;
+    }
+    let table = target.nextSibling.firstElementChild.firstElementChild;
+    table.classList.remove('d-none');
+    table.classList.add('d-table');
+    target.classList.remove("contract-collapsed");
+    target.classList.add("contract-expanded");
+  });
+
+  $(document).on("click", ".contract-expanded", function(e) {
+    let target = e.target;
+    while (target.tagName != "TR") {
+      target = target.parentElement;
+    }
+    let table = target.nextSibling.firstElementChild.firstElementChild;
+    table.classList.add('d-none');
+    table.classList.remove('d-table');
+    target.classList.add("contract-collapsed");
+    target.classList.remove("contract-expanded");
+  })
+});
