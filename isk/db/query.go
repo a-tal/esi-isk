@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
@@ -12,13 +13,14 @@ import (
 // GetStatements prepares all queries for the global context
 func GetStatements(ctx context.Context) map[cx.Key]*sqlx.NamedStmt {
 	db := ctx.Value(cx.DB).(*sqlx.DB)
+	opts := ctx.Value(cx.Opts).(*cx.Options)
 	statements := map[cx.Key]*sqlx.NamedStmt{}
 
 	queries := map[cx.Key]string{
-		cx.StmtTopReceived: `SELECT * FROM characters
+		cx.StmtTopReceived: `SELECT * FROM characters WHERE good_standing
 ORDER BY received_isk DESC LIMIT 6`,
 
-		cx.StmtTopDonated: `SELECT * FROM characters
+		cx.StmtTopDonated: `SELECT * FROM characters WHERE good_standing
 ORDER BY donated_isk DESC LIMIT 6`,
 
 		cx.StmtCharDetails: `SELECT * FROM characters
@@ -107,7 +109,8 @@ WHERE character_id = :character_id`,
     donated,
     donated_isk,
     last_donated,
-    last_received
+    last_received,
+    good_standing
 ) VALUES (
     :character_id,
     :corporation_id,
@@ -117,7 +120,8 @@ WHERE character_id = :character_id`,
     :donated,
     :donated_isk,
     :last_donated,
-    :last_received
+    :last_received,
+    :good_standing
 )`,
 
 		cx.StmtUpdateCharacter: `UPDATE characters SET
@@ -128,7 +132,8 @@ WHERE character_id = :character_id`,
     donated = :donated,
     donated_isk = :donated_isk,
     last_donated = :last_donated,
-    last_received = :last_received
+    last_received = :last_received,
+    good_standing = :good_standing
 WHERE character_id = :character_id`,
 
 		cx.StmtAddContract: `INSERT INTO contracts (
@@ -166,6 +171,11 @@ WHERE character_id = :character_id`,
     :item_id,
     :quantity
 )`,
+
+		cx.StmtCharStandingISK: fmt.Sprintf(
+			"SELECT * FROM donations WHERE receiver = %d AND donator = :character_id",
+			opts.CharacterID,
+		),
 	}
 
 	for key, query := range queries {

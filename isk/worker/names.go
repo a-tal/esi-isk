@@ -79,7 +79,7 @@ func resolveNames(ctx context.Context, charID int32) (*db.Affiliation, error) {
 
 	aff := &db.Affiliation{}
 
-	ret, err := resolveName(ctx, charID)
+	ret, err := ResolveName(ctx, charID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func resolveNames(ctx context.Context, charID int32) (*db.Affiliation, error) {
 		if res.Category == "corporation" {
 			aff.Corporation = &db.Name{ID: res.Id, Name: res.Name}
 
-			allianceID, allianceName := resolveCorporation(ctx, res.Id)
+			allianceID, allianceName := ResolveCorporation(ctx, res.Id)
 			if allianceID > 0 {
 				aff.Alliance = &db.Name{ID: allianceID, Name: allianceName}
 			}
@@ -97,10 +97,10 @@ func resolveNames(ctx context.Context, charID int32) (*db.Affiliation, error) {
 		} else if res.Category == "character" {
 			aff.Character = &db.Name{ID: res.Id, Name: res.Name}
 
-			corpID, corpName := resolveCharacter(ctx, res.Id)
+			corpID, corpName := ResolveCharacter(ctx, res.Id)
 			if corpID > 0 { // 0 == error in lookup
 				aff.Corporation = &db.Name{ID: corpID, Name: corpName}
-				allianceID, allianceName := resolveCorporation(ctx, corpID)
+				allianceID, allianceName := ResolveCorporation(ctx, corpID)
 				if allianceID > 0 { // 0 == error or not in alliance
 					aff.Alliance = &db.Name{ID: allianceID, Name: allianceName}
 				}
@@ -119,8 +119,8 @@ func resolveNames(ctx context.Context, charID int32) (*db.Affiliation, error) {
 	return aff, nil
 }
 
-// return the ID and name of the corporation's alliance
-func resolveCorporation(ctx context.Context, corpID int32) (int32, string) {
+// ResolveCorporation returns the ID and name of the corporation's alliance
+func ResolveCorporation(ctx context.Context, corpID int32) (int32, string) {
 	client := ctx.Value(cx.Client).(*goesi.APIClient)
 
 	ret, _, err := client.ESI.CorporationApi.GetCorporationsCorporationId(
@@ -134,7 +134,7 @@ func resolveCorporation(ctx context.Context, corpID int32) (int32, string) {
 	}
 
 	if ret.AllianceId > 0 {
-		allianceNameRes, err := resolveName(ctx, ret.AllianceId)
+		allianceNameRes, err := ResolveName(ctx, ret.AllianceId)
 		if err != nil {
 			log.Printf("failed to resolve the alliance of corp: %d", corpID)
 			return 0, ""
@@ -149,8 +149,8 @@ func resolveCorporation(ctx context.Context, corpID int32) (int32, string) {
 	return 0, ""
 }
 
-// resolveCharacter returns the ID and name of the character's corporation
-func resolveCharacter(ctx context.Context, charID int32) (int32, string) {
+// ResolveCharacter returns the ID and name of the character's corporation
+func ResolveCharacter(ctx context.Context, charID int32) (int32, string) {
 	client := ctx.Value(cx.Client).(*goesi.APIClient)
 
 	ret, _, err := client.ESI.CharacterApi.GetCharactersCharacterId(
@@ -164,7 +164,7 @@ func resolveCharacter(ctx context.Context, charID int32) (int32, string) {
 		return 0, ""
 	}
 
-	corpRes, err := resolveName(ctx, ret.CorporationId)
+	corpRes, err := ResolveName(ctx, ret.CorporationId)
 	if err != nil {
 		log.Printf("failed to resolve name of corp %d: %+v", ret.CorporationId, err)
 		return 0, ""
@@ -179,7 +179,8 @@ func resolveCharacter(ctx context.Context, charID int32) (int32, string) {
 	return 0, ""
 }
 
-func resolveName(ctx context.Context, charID ...int32) (
+// ResolveName returns the post universe names return
+func ResolveName(ctx context.Context, charID ...int32) (
 	[]esi.PostUniverseNames200Ok,
 	error,
 ) {

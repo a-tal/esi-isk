@@ -400,7 +400,7 @@ function formatISK(n) {
   }) + ' ISK';
 }
 
-function largeCharacterImage(charID, charName, imgType, imgExtn) {
+function largeCharacterImage(charID, charName, imgType, imgExtn, standing) {
   let charImg = document.createElement('img');
   charImg.height = 128;
   charImg.width = 128;
@@ -413,11 +413,25 @@ function largeCharacterImage(charID, charName, imgType, imgExtn) {
   charNameP.classList.add('text-muted');
   charNameP.classList.add('my-0');
 
+  if (standing == true) {
+    charNameP.appendChild(standingSpan())
+  }
+
   charNameP.innerHTML = charName;
   charDiv.appendChild(charImg);
   charDiv.appendChild(charNameP);
 
   return charDiv;
+}
+
+function standingSpan() {
+  let span = document.createElement('span');
+  span.classList.add('text-success');
+  span.classList.add('small');
+  span.classList.add('pl-1');
+  span.innerHTML = '✓';
+  span.title = 'user is in good standing';
+  return span
 }
 
 function smallCharacterImage(charID) {
@@ -470,8 +484,10 @@ function characterViewDiv(charID) {
   jQuery.ajax({
     url: "/api/char?c=" + charID,
     success: function(t) {
-
       charImg.getElementsByTagName('p')[0].innerHTML = t.character.name;
+      if (t.character.good_standing == true) {
+        charImg.getElementsByTagName('p')[0].appendChild(standingSpan())
+      }
 
       let corpImg = largeCharacterImage(
         t.character.corporation,

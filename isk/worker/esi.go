@@ -37,7 +37,8 @@ func addClient(ctx context.Context) context.Context {
 	return ctx
 }
 
-func workerContext(ctx context.Context) context.Context {
+// WorkerContext adds the goesi client and auth to context
+func WorkerContext(ctx context.Context) context.Context {
 	ctx = context.WithValue(ctx, cx.DB, db.Connect(ctx))
 	ctx = context.WithValue(ctx, cx.Statements, db.GetStatements(ctx))
 
@@ -62,33 +63,85 @@ func workerContext(ctx context.Context) context.Context {
 
 // Run -- main worker entry point -- this function does not return
 func Run(ctx context.Context) {
-	ctx = workerContext(ctx)
+	ctx = WorkerContext(ctx)
 
 	for {
-		users, err := db.GetUsersToProcess(ctx)
-		if err != nil {
-			log.Printf("could not pull users to process: %+v", err)
-			time.Sleep(1 * time.Minute)
+		updateStandings(ctx, processUsers(ctx))
+		time.Sleep(1 * time.Minute)
+	}
+}
+
+func updateStandings(ctx context.Context, charIDs []int32) {
+	opts := ctx.Value(cx.Opts).(*cx.Options)
+	for _, charID := range charIDs {
+		if charID == opts.CharacterID {
 			continue
 		}
 
-		for _, user := range users {
-			// TODO: make this parallel
-
-			ctx, err = addCharacterAuth(ctx, user)
-			if err != nil {
-				log.Printf("failed to get character auth: %+v", err)
-				// delete the character? or track failures then delete
-				continue
-			}
-
-			if err := pullCharacter(ctx, user); err != nil {
-				log.Printf("error pulling character %d: %+v", user.CharacterID, err)
-			}
+		char, err := db.GetCharacter(ctx, charID)
+		if err != nil {
+			continue
 		}
 
-		time.Sleep(1 * time.Minute)
+		standingISK, err := db.GetCharStandingISK(ctx, charID)
+		if err != nil {
+			continue
+		}
+
+		donations, err := db.GetCharDonations(ctx, charID)
+		if err != nil {
+			continue
+		}
+
+		total := float64(0)
+		for _, donation := range donations {
+			total += donation.Amount
+		}
+		char.GoodStanding = standingISK > (total * float64(0.01))
+
+		if err := db.SaveCharacter(ctx, char); err != nil {
+			log.Printf("failed to save character %d: %+v", charID, err)
+		}
 	}
+}
+
+func processUsers(ctx context.Context) []int32 {
+	processed := []int32{}
+	users, err := db.GetUsersToProcess(ctx)
+	if err != nil {
+		log.Printf("could not pull users to process: %+v", err)
+		return processed
+	}
+
+	for _, user := range users {
+		// TODO: make this parallel
+
+		ctx, err = addCharacterAuth(ctx, user)
+		if err != nil {
+			log.Printf("failed to get character auth: %+v", err)
+			// delete the character? or track failures then delete
+			return processed
+		}
+
+		charIDs, err := pullCharacter(ctx, user)
+		if err != nil {
+			log.Printf("error pulling character %d: %+v", user.CharacterID, err)
+		} else {
+			for _, charID := range charIDs {
+				isKnown := false
+				for _, known := range processed {
+					if known == charID {
+						isKnown = true
+					}
+				}
+				if !isKnown {
+					processed = append(processed, charID)
+				}
+			}
+		}
+	}
+
+	return processed
 }
 
 func getCharacterToken(
@@ -135,22 +188,20 @@ func addCharacterAuth(
 }
 
 // pullCharacter is the top level function to pull a character's details
-func pullCharacter(ctx context.Context, user *db.User) error {
+func pullCharacter(ctx context.Context, user *db.User) ([]int32, error) {
 	log.Printf("pulling character: %d", user.CharacterID)
 
-	if err := pullCharacterWallet(ctx, user); err != nil {
-		return err
+	charIDs, err := pullCharacterWallet(ctx, user)
+	if err != nil {
+		return charIDs, err
 	}
-
 	log.Printf("pulled character wallet: %d", user.CharacterID)
 
+	// TODO: return charIDs and append in contracts
 	if err := pullCharacterContracts(ctx, user); err != nil {
-		return err
+		return charIDs, err
 	}
+	log.Printf("pulled character contracts: %d", user.CharacterID)
 
-	log.Printf("saving character: %d", user.CharacterID)
-	err := db.SaveUser(ctx, user)
-
-	log.Printf("saved character: %d. error: %+v", user.CharacterID, err)
-	return err
+	return charIDs, db.SaveUser(ctx, user)
 }

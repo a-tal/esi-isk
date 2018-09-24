@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS characters (
     donated_isk      DOUBLE PRECISION NOT NULL,
     last_donated     TIMESTAMP,
     last_received    TIMESTAMP,
+    good_standing    BOOLEAN          NOT NULL DEFAULT false,
 
     PRIMARY KEY (character_id)
 );

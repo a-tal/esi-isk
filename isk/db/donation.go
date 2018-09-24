@@ -28,12 +28,28 @@ type Donation struct {
 	Amount float64 `db:"amount" json:"amount"`
 }
 
-func getCharDonations(ctx context.Context, charID int32) ([]*Donation, error) {
+// GetCharDonations returns donations FOR the character
+func GetCharDonations(ctx context.Context, charID int32) ([]*Donation, error) {
 	return getDonations(ctx, charID, cx.StmtCharDonations)
 }
 
-func getCharDonated(ctx context.Context, charID int32) ([]*Donation, error) {
+// GetCharDonated returns donations FROM the character
+func GetCharDonated(ctx context.Context, charID int32) ([]*Donation, error) {
 	return getDonations(ctx, charID, cx.StmtCharDonated)
+}
+
+// GetCharStandingISK returns the amount donated towards improving standing
+func GetCharStandingISK(ctx context.Context, charID int32) (float64, error) {
+	donations, err := getDonations(ctx, charID, cx.StmtCharStandingISK)
+	if err != nil {
+		return 0, err
+	}
+
+	total := float64(0)
+	for _, d := range donations {
+		total += d.Amount
+	}
+	return total, nil
 }
 
 func getDonations(ctx context.Context, charID int32, key cx.Key) (

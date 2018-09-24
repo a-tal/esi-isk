@@ -57,6 +57,9 @@ type Character struct {
 
 	// LastReceived timestamp
 	LastReceived time.Time `json:"last_received,omitempty"`
+
+	// GoodStanding boolean
+	GoodStanding bool `json:"good_standing"`
 }
 
 // CharacterRow describes Character as stored in the characters table
@@ -87,6 +90,9 @@ type CharacterRow struct {
 
 	// LastReceived timestamp
 	LastReceived pq.NullTime `db:"last_received"`
+
+	// GoodStanding boolean
+	GoodStanding bool `db:"good_standing"`
 }
 
 // CharDetails is the api return for a character
@@ -104,7 +110,7 @@ type CharDetails struct {
 
 // GetCharDetails returns details for the character from pg
 func GetCharDetails(ctx context.Context, charID int32) (*CharDetails, error) {
-	char, err := getCharDetails(ctx, charID)
+	char, err := GetCharacter(ctx, charID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,12 +125,12 @@ func GetCharDetails(ctx context.Context, charID int32) (*CharDetails, error) {
 		return nil, err
 	}
 
-	donations, err := getCharDonations(ctx, charID)
+	donations, err := GetCharDonations(ctx, charID)
 	if err != nil {
 		return nil, err
 	}
 
-	donated, err := getCharDonated(ctx, charID)
+	donated, err := GetCharDonated(ctx, charID)
 	if err != nil {
 		return nil, err
 	}
@@ -212,13 +218,18 @@ func SaveCharacterContracts(
 	return saveCharacters(ctx, newCharacters, updatedCharacters)
 }
 
+// SaveCharacter saves a single character
+func SaveCharacter(ctx context.Context, char *Character) error {
+	return updateCharacter(ctx, char.toRow())
+}
+
 func saveCharacters(
 	ctx context.Context,
 	newCharacters, updatedCharacters []*CharacterRow,
 ) error {
 	failedChars := []string{}
 	for _, char := range newCharacters {
-		if err := newCharacter(ctx, char); err != nil {
+		if err := NewCharacter(ctx, char); err != nil {
 			log.Printf("failed to save new character %d: %+v", char.ID, err)
 			failedChars = append(failedChars, fmt.Sprintf("%d", char.ID))
 		}
@@ -248,7 +259,7 @@ func bindAffiliation(
 ) (row *CharacterRow, new bool) {
 	aff := getAffiliation(charID, affiliations)
 
-	char, err := getCharDetails(ctx, charID)
+	char, err := GetCharacter(ctx, charID)
 
 	if err != nil {
 		new = true
@@ -290,8 +301,8 @@ func addToTotals(donation *Donation, characters ...[]*CharacterRow) {
 	}
 }
 
-// newCharacter adds a new character to the characters table
-func newCharacter(ctx context.Context, char *CharacterRow) error {
+// NewCharacter adds a new character to the characters table
+func NewCharacter(ctx context.Context, char *CharacterRow) error {
 	return executeChar(ctx, char, cx.StmtCreateCharacter)
 }
 
@@ -312,10 +323,12 @@ func executeChar(ctx context.Context, char *CharacterRow, key cx.Key) error {
 		"donated_isk":    char.DonatedISK,
 		"last_donated":   char.LastDonated,
 		"last_received":  char.LastReceived,
+		"good_standing":  char.GoodStanding,
 	})
 }
 
-func getCharDetails(ctx context.Context, charID int32) (*Character, error) {
+// GetCharacter pulls a single character from the db
+func GetCharacter(ctx context.Context, charID int32) (*Character, error) {
 	rows, err := queryNamedResult(
 		ctx,
 		cx.StmtCharDetails,
@@ -394,6 +407,7 @@ func (c *CharacterRow) toCharacter() *Character {
 		ReceivedISK:   c.ReceivedISK,
 		Donated:       c.Donated,
 		DonatedISK:    c.DonatedISK,
+		GoodStanding:  c.GoodStanding,
 	}
 	if c.LastDonated.Valid {
 		char.LastDonated = c.LastDonated.Time
@@ -421,5 +435,6 @@ func (c *Character) toRow() *CharacterRow {
 			Time:  c.LastReceived,
 			Valid: !c.LastReceived.IsZero(),
 		},
+		GoodStanding: c.GoodStanding,
 	}
 }

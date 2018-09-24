@@ -16,6 +16,7 @@ import (
 	"github.com/a-tal/esi-isk/isk/api"
 	"github.com/a-tal/esi-isk/isk/cx"
 	"github.com/a-tal/esi-isk/isk/db"
+	"github.com/a-tal/esi-isk/isk/worker"
 )
 
 func getAllowed(options *cx.Options) []string {
@@ -38,6 +39,10 @@ func RunServer(ctx context.Context) {
 	ctx = context.WithValue(ctx, cx.DB, db.Connect(ctx))
 	ctx = context.WithValue(ctx, cx.Statements, db.GetStatements(ctx))
 	ctx = context.WithValue(ctx, cx.StateStore, api.NewStateStore())
+
+	if err := InitialSetup(ctx); err != nil {
+		log.Fatalf("failed to initialize db: %+v", err)
+	}
 
 	mux := http.NewServeMux()
 
@@ -91,4 +96,63 @@ func RunServer(ctx context.Context) {
 	}
 
 	log.Fatal(server.ListenAndServe())
+}
+
+// InitialSetup ensures the owning character exists in the db
+func InitialSetup(ctx context.Context) error {
+	opts := ctx.Value(cx.Opts).(*cx.Options)
+	_, err := db.GetCharacter(ctx, opts.CharacterID)
+
+	if err == nil {
+		return nil
+	}
+	ctx = worker.WorkerContext(ctx)
+
+	names, err := worker.ResolveName(ctx, opts.CharacterID)
+	if err != nil {
+		return err
+	}
+
+	var charName string
+	for _, name := range names {
+		if name.Category == "character" && name.Id == opts.CharacterID {
+			charName = name.Name
+			break
+		}
+	}
+
+	if charName == "" {
+		return fmt.Errorf(
+			"could not lookup name for owning character ID: %d",
+			opts.CharacterID,
+		)
+	}
+
+	corp, corpName := worker.ResolveCharacter(ctx, opts.CharacterID)
+
+	aff := &db.Affiliation{
+		Character:   &db.Name{ID: opts.CharacterID, Name: charName},
+		Corporation: &db.Name{ID: corp, Name: corpName},
+	}
+
+	alliance, allianceName := worker.ResolveCorporation(ctx, corp)
+	if alliance > 0 {
+		aff.Alliance = &db.Name{ID: alliance, Name: allianceName}
+	}
+
+	if err := db.SaveNames(ctx, []*db.Affiliation{aff}); err != nil {
+		return err
+	}
+
+	log.Printf("creating owner character: %d", opts.CharacterID)
+	return db.NewCharacter(ctx, &db.CharacterRow{
+		ID:            opts.CharacterID,
+		CorporationID: corp,
+		AllianceID:    alliance,
+		Received:      0,
+		ReceivedISK:   0,
+		Donated:       0,
+		DonatedISK:    0,
+		GoodStanding:  true,
+	})
 }

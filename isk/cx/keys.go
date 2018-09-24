@@ -109,4 +109,7 @@ const (
 
 	// StmtAddContractItems creates a new contract item row
 	StmtAddContractItems = Key("StmtAddContractItems")
+
+	// StmtCharStandingISK queries donations towards standings
+	StmtCharStandingISK = Key("StmtCharStandingISK")
 )

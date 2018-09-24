@@ -16,6 +16,7 @@ import (
 type Options struct {
 	Production, Debug, HTTPS bool
 	Port                     int
+	CharacterID              int32 // characterID of standings character
 	Hostname, ESI            string
 	DB                       *DBOptions
 	Auth                     *oauth2.Config
@@ -66,6 +67,7 @@ func NewOptions(ctx context.Context) context.Context {
 	production := flag.Bool("production", false, "if this is being run in prod")
 	authConf := flag.String("auth", "/secret/sso.json", "path to auth config")
 	esi := flag.String("esi", "https://esi.evetech.net", "basepath for ESI")
+	characterID := flag.Int("character", 2114454465, "standings char ID")
 
 	flag.Parse()
 
@@ -73,12 +75,13 @@ func NewOptions(ctx context.Context) context.Context {
 	// provider := ctx.Value(Provider).(*oidc.Provider)
 
 	opts := &Options{
-		Production: *production,
-		Debug:      *debug,
-		HTTPS:      *https,
-		Hostname:   *hostname,
-		Port:       *port,
-		ESI:        *esi,
+		Production:  *production,
+		Debug:       *debug,
+		HTTPS:       *https,
+		Hostname:    *hostname,
+		Port:        *port,
+		CharacterID: int32(*characterID),
+		ESI:         *esi,
 		DB: &DBOptions{
 			Host:     *host,
 			User:     *user,
