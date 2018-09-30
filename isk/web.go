@@ -89,11 +89,12 @@ func RunServer(ctx context.Context) {
 		negroni.NewLogger(),
 
 		negroni.HandlerFunc(secure.New(secure.Options{
-			FrameDeny:             true,
-			SSLProxyHeaders:       map[string]string{"X-Forwarded-Proto": "https"},
-			STSSeconds:            315360000,
-			IsDevelopment:         opts.Debug,
-			ContentSecurityPolicy: "default-src 'self' script-src 'unsafe-inline'",
+			FrameDeny:       true,
+			SSLProxyHeaders: map[string]string{"X-Forwarded-Proto": "https"},
+			STSSeconds:      315360000,
+			IsDevelopment:   opts.Debug,
+			ContentSecurityPolicy: "default-src 'self' script-src 'unsafe-inline' " +
+				"img-src 'self' imageserver.eveonline.com",
 		}).HandlerFuncWithNext),
 
 		cors.New(cors.Options{
