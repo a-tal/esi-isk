@@ -10,8 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	oidc "github.com/coreos/go-oidc"
+	sessions "github.com/goincremental/negroni-sessions"
 	"github.com/twinj/uuid"
 	"golang.org/x/oauth2"
 
@@ -21,17 +23,18 @@ import (
 
 // StateStore stores state uuids we've given out
 type StateStore struct {
-	lock *sync.Mutex
-	// XXX store w/ timestamp, add pruning bg job
-	states []string
+	lock   *sync.Mutex
+	states map[string]time.Time
 }
 
 // NewStateStore returns a new StateStore
 func NewStateStore() *StateStore {
-	return &StateStore{
+	ss := &StateStore{
 		lock:   &sync.Mutex{},
-		states: []string{},
+		states: map[string]time.Time{},
 	}
+	go ss.maintenance()
+	return ss
 }
 
 // NewProvider creates our oidc provider
@@ -47,25 +50,57 @@ func NewProvider(ctx context.Context) context.Context {
 	return ctx
 }
 
+// maintenance ensures we don't leak memory storing state uuids forever
+func (s *StateStore) maintenance() {
+	for {
+		time.Sleep(30 * time.Second)
+		s.prune()
+	}
+}
+
+// prune will remove any stale states from memory
+func (s *StateStore) prune() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	cutoff := stateCutoff()
+	toPrune := []string{}
+	for state, ts := range s.states {
+		if ts.Before(cutoff) {
+			toPrune = append(toPrune, state)
+		}
+	}
+
+	for _, p := range toPrune {
+		log.Printf("pruning old state: %s ts: %s", p, s.states[p])
+		delete(s.states, p)
+	}
+}
+
 func knownState(ctx context.Context, state string) bool {
 	ss := ctx.Value(cx.StateStore).(*StateStore)
 	ss.lock.Lock()
 	defer ss.lock.Unlock()
 
-	for i, s := range ss.states {
-		if s == state {
-			ss.states = append(ss.states[:i], ss.states[i:]...)
-			return true
-		}
+	ts, found := ss.states[state]
+	if !found {
+		return false
 	}
-	return false
+
+	delete(ss.states, state)
+
+	return ts.After(stateCutoff())
+}
+
+func stateCutoff() time.Time {
+	return time.Now().UTC().Add(-time.Duration(300) * time.Second)
 }
 
 func newState(ctx context.Context) string {
 	state := uuid.NewV4().String()
 	ss := ctx.Value(cx.StateStore).(*StateStore)
 	ss.lock.Lock()
-	ss.states = append(ss.states, state)
+	ss.states[state] = time.Now().UTC()
 	ss.lock.Unlock()
 	return state
 }
@@ -119,9 +154,13 @@ func Callback(ctx context.Context) http.HandlerFunc {
 			return
 		}
 
-		url := fmt.Sprintf("/?c=%d&s=created", user.CharacterID)
+		session := sessions.GetSession(r)
+		session.Set("c", user.CharacterID)
 
-		http.Redirect(w, r.WithContext(ctx), url, 302)
+		http.Redirect(w, r.WithContext(ctx), fmt.Sprintf(
+			"/#prefs&c=%d&t=d",
+			user.CharacterID,
+		), 302)
 	}
 }
 

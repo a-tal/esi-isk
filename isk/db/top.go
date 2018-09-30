@@ -66,7 +66,7 @@ func getTop(
 		if char == nil {
 			continue
 		}
-		name, err := getName(ctx, char.ID)
+		name, err := GetName(ctx, char.ID)
 		if err != nil {
 			log.Printf("failed to lookup name for: %d", char.ID)
 		} else {

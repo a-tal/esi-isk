@@ -21,6 +21,12 @@ const (
 	// Cache is our httpCache object
 	Cache = Key("Cache")
 
+	// Adapter is our http-cache adapter
+	Adapter = Key("Adapter")
+
+	// Prices is our in-memory cache of market prices
+	Prices = Key("Prices")
+
 	// Statements is our map of prepared statements (map[Key]sqlx.Stmt)
 	Statements = Key("Statements")
 
@@ -112,4 +118,40 @@ const (
 
 	// StmtCharStandingISK queries donations towards standings
 	StmtCharStandingISK = Key("StmtCharStandingISK")
+
+	// StmtCreatePreferences creates a new preferences row for the user
+	StmtCreatePreferences = Key("StmtCreatePreferences")
+
+	// StmtGetPreferences gets the preferences for the user
+	StmtGetPreferences = Key("StmtGetPreferences")
+
+	// StmtSetDonationPreferences updates the donation preferences for the user
+	StmtSetDonationPreferences = Key("StmtSetDonationPreferences")
+
+	// StmtSetContractPreferences updates the contract preferences for the user
+	StmtSetContractPreferences = Key("StmtSetContractPreferences")
+
+	// StmtGetOutstandingContracts retrieves the outstanding contracts for a user
+	StmtGetOutstandingContracts = Key("StmtGetOutstandingContracts")
+
+	// StmtAcceptContract updates a contract status to accepted
+	StmtAcceptContract = Key("StmtAcceptContract")
+
+	// StmtSetCombinedPreferences updates the combined preferences
+	StmtSetCombinedPreferences = Key("StmtSetCombinedPreferences")
+
+	// StmtGetStaleContracts returns contracts older than 30 days
+	StmtGetStaleContracts = Key("StmtGetStaleContracts")
+
+	// StmtGetStaleDonations returns donations older than 30 days
+	StmtGetStaleDonations = Key("StmtGetStaleDonations")
+
+	// StmtRemoveContract removes a contract by ID
+	StmtRemoveContract = Key("StmtRemoveContract")
+
+	// StmtRemoveContractItems removes contract items by ID
+	StmtRemoveContractItems = Key("StmtRemoveContractItems")
+
+	// StmtRemoveDonation removes a donation by ID
+	StmtRemoveDonation = Key("StmtRemoveDonation")
 )

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -46,11 +47,23 @@ type Character struct {
 	// ReceivedISK value of all donations plus contracts
 	ReceivedISK float64 `json:"received_isk,omitempty"`
 
+	// Received donations and/or contracts in the last 30 days
+	Received30 int64 `json:"received_30,omitempty"`
+
+	// ReceivedISK30 value of all donations plus contracts in the last 30 days
+	ReceivedISK30 float64 `json:"received_isk_30,omitempty"`
+
 	// Donated is the number of times this character has donated to someone else
 	Donated int64 `json:"donated,omitempty"`
 
 	// DonatedISK is the value of all ISK donated
 	DonatedISK float64 `json:"donated_isk,omitempty"`
+
+	// Donated30 is the number of donations in the last 30 days
+	Donated30 int64 `json:"donated_30,omitempty"`
+
+	// DonatedISK30 is the value of all ISK donated in the last 30 days
+	DonatedISK30 float64 `json:"donated_isk_30,omitempty"`
 
 	// LastDonated timestamp
 	LastDonated time.Time `json:"last_donated,omitempty"`
@@ -60,6 +73,31 @@ type Character struct {
 
 	// GoodStanding boolean
 	GoodStanding bool `json:"good_standing"`
+}
+
+// MarshalJSON implementation to omit our null timestamps
+func (c *Character) MarshalJSON() ([]byte, error) {
+	type Alias Character
+
+	var lastDonatedStr string
+	var lastReceivedStr string
+
+	if !c.LastDonated.IsZero() {
+		lastDonatedStr = c.LastDonated.Format(time.RFC3339)
+	}
+	if !c.LastReceived.IsZero() {
+		lastReceivedStr = c.LastReceived.Format(time.RFC3339)
+	}
+
+	return json.Marshal(&struct {
+		*Alias
+		LastReceived string `json:"last_received,omitempty"`
+		LastDonated  string `json:"last_donated,omitempty"`
+	}{
+		Alias:        (*Alias)(c),
+		LastReceived: lastReceivedStr,
+		LastDonated:  lastDonatedStr,
+	})
 }
 
 // CharacterRow describes Character as stored in the characters table
@@ -79,11 +117,23 @@ type CharacterRow struct {
 	// ReceivedISK value of all donations plus contracts
 	ReceivedISK float64 `db:"received_isk"`
 
+	// Received donations and/or contracts in the last 30 days
+	Received30 int64 `db:"received_30"`
+
+	// ReceivedISK30 value of all donations plus contracts in the last 30 days
+	ReceivedISK30 float64 `db:"received_isk_30"`
+
 	// Donated is the number of times this character has donated to someone else
 	Donated int64 `db:"donated"`
 
 	// DonatedISK is the value of all ISK donated
 	DonatedISK float64 `db:"donated_isk"`
+
+	// Donated30 is the number of donations in the last 30 days
+	Donated30 int64 `db:"donated_30"`
+
+	// DonatedISK30 is the value of all ISK donated in the last 30 days
+	DonatedISK30 float64 `db:"donated_isk_30"`
 
 	// LastDonated timestamp
 	LastDonated pq.NullTime `db:"last_donated"`
@@ -100,12 +150,12 @@ type CharDetails struct {
 	Character *Character `json:"character"`
 
 	// ISK IN
-	Donations []*Donation `json:"donations,omitempty"`
-	Contracts []*Contract `json:"contracts,omitempty"`
+	Donations Donations `json:"donations,omitempty"`
+	Contracts Contracts `json:"contracts,omitempty"`
 
 	// ISK OUT
-	Donated    []*Donation `json:"donated,omitempty"`
-	Contracted []*Contract `json:"contracted,omitempty"`
+	Donated    Donations `json:"donated,omitempty"`
+	Contracted Contracts `json:"contracted,omitempty"`
 }
 
 // GetCharDetails returns details for the character from pg
@@ -161,6 +211,7 @@ func SaveCharacterDonations(
 	ctx context.Context,
 	donations []*Donation,
 	affiliations []*Affiliation,
+	addition bool,
 ) error {
 	newCharacters := []*CharacterRow{}
 	updatedCharacters := []*CharacterRow{}
@@ -181,7 +232,12 @@ func SaveCharacterDonations(
 			}
 		}
 
-		addToTotals(donation, newCharacters, updatedCharacters)
+		if addition {
+			addToTotals(donation, newCharacters, updatedCharacters)
+		} else {
+			removeFromTotals(donation, newCharacters, updatedCharacters)
+		}
+
 	}
 
 	return saveCharacters(ctx, newCharacters, updatedCharacters)
@@ -190,14 +246,18 @@ func SaveCharacterDonations(
 // SaveCharacterContracts updates all totals in the characters table
 func SaveCharacterContracts(
 	ctx context.Context,
-	donations []*Contract,
+	donations Contracts,
 	affiliations []*Affiliation,
+	addition bool,
 ) error {
 	newCharacters := []*CharacterRow{}
 	updatedCharacters := []*CharacterRow{}
 	allCharacters := []int32{}
 
 	for _, contract := range donations {
+		if !contract.Accepted {
+			continue
+		}
 		for _, charID := range []int32{contract.Donator, contract.Receiver} {
 			if inInt32(charID, allCharacters) {
 				continue
@@ -212,7 +272,11 @@ func SaveCharacterContracts(
 			}
 		}
 
-		addToContractTotals(contract, newCharacters, updatedCharacters)
+		if addition {
+			addToContractTotals(contract, newCharacters, updatedCharacters)
+		} else {
+			removeFromContractTotals(contract, newCharacters, updatedCharacters)
+		}
 	}
 
 	return saveCharacters(ctx, newCharacters, updatedCharacters)
@@ -283,6 +347,8 @@ func addToTotals(donation *Donation, characters ...[]*CharacterRow) {
 			if char.ID == donation.Donator {
 				char.DonatedISK += donation.Amount
 				char.Donated++
+				char.DonatedISK30 += donation.Amount
+				char.Donated30++
 				if !char.LastDonated.Valid || char.LastDonated.Time.Before(
 					donation.Timestamp) {
 					char.LastDonated = pq.NullTime{Time: donation.Timestamp, Valid: true}
@@ -291,11 +357,28 @@ func addToTotals(donation *Donation, characters ...[]*CharacterRow) {
 			} else if char.ID == donation.Recipient {
 				char.ReceivedISK += donation.Amount
 				char.Received++
+				char.ReceivedISK30 += donation.Amount
+				char.Received30++
 				if !char.LastReceived.Valid || char.LastReceived.Time.Before(
 					donation.Timestamp) {
 					char.LastReceived = pq.NullTime{Time: donation.Timestamp, Valid: true}
 					char.LastReceived.Valid = true
 				}
+			}
+		}
+	}
+}
+
+// removeFromTotals removes donation/received totals (from 30 day)
+func removeFromTotals(donation *Donation, characters ...[]*CharacterRow) {
+	for _, chars := range characters {
+		for _, char := range chars {
+			if char.ID == donation.Donator {
+				char.DonatedISK30 -= donation.Amount
+				char.Donated30--
+			} else if char.ID == donation.Recipient {
+				char.ReceivedISK30 -= donation.Amount
+				char.Received30--
 			}
 		}
 	}
@@ -314,16 +397,20 @@ func updateCharacter(ctx context.Context, char *CharacterRow) error {
 // executeChar is a DRY helper to create or update a character
 func executeChar(ctx context.Context, char *CharacterRow, key cx.Key) error {
 	return executeNamed(ctx, key, map[string]interface{}{
-		"character_id":   char.ID,
-		"corporation_id": char.CorporationID,
-		"alliance_id":    char.AllianceID,
-		"received":       char.Received,
-		"received_isk":   char.ReceivedISK,
-		"donated":        char.Donated,
-		"donated_isk":    char.DonatedISK,
-		"last_donated":   char.LastDonated,
-		"last_received":  char.LastReceived,
-		"good_standing":  char.GoodStanding,
+		"character_id":    char.ID,
+		"corporation_id":  char.CorporationID,
+		"alliance_id":     char.AllianceID,
+		"received":        char.Received,
+		"received_isk":    char.ReceivedISK,
+		"received_30":     char.Received30,
+		"received_isk_30": char.ReceivedISK30,
+		"donated":         char.Donated,
+		"donated_isk":     char.DonatedISK,
+		"donated_30":      char.Donated30,
+		"donated_isk_30":  char.DonatedISK30,
+		"last_donated":    char.LastDonated,
+		"last_received":   char.LastReceived,
+		"good_standing":   char.GoodStanding,
 	})
 }
 
@@ -404,9 +491,13 @@ func (c *CharacterRow) toCharacter() *Character {
 		CorporationID: c.CorporationID,
 		AllianceID:    c.AllianceID,
 		Received:      c.Received,
-		ReceivedISK:   c.ReceivedISK,
+		ReceivedISK:   round2(c.ReceivedISK),
+		Received30:    c.Received30,
+		ReceivedISK30: round2(c.ReceivedISK30),
 		Donated:       c.Donated,
-		DonatedISK:    c.DonatedISK,
+		DonatedISK:    round2(c.DonatedISK),
+		Donated30:     c.Donated30,
+		DonatedISK30:  round2(c.DonatedISK30),
 		GoodStanding:  c.GoodStanding,
 	}
 	if c.LastDonated.Valid {
@@ -425,8 +516,12 @@ func (c *Character) toRow() *CharacterRow {
 		AllianceID:    c.AllianceID,
 		Received:      c.Received,
 		ReceivedISK:   c.ReceivedISK,
+		Received30:    c.Received30,
+		ReceivedISK30: c.ReceivedISK30,
 		Donated:       c.Donated,
 		DonatedISK:    c.DonatedISK,
+		Donated30:     c.Donated30,
+		DonatedISK30:  c.DonatedISK30,
 		LastDonated: pq.NullTime{
 			Time:  c.LastDonated,
 			Valid: !c.LastDonated.IsZero(),

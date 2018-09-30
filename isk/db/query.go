@@ -18,10 +18,10 @@ func GetStatements(ctx context.Context) map[cx.Key]*sqlx.NamedStmt {
 
 	queries := map[cx.Key]string{
 		cx.StmtTopReceived: `SELECT * FROM characters WHERE good_standing
-ORDER BY received_isk DESC LIMIT 6`,
+ORDER BY received_isk_30 DESC LIMIT 6`,
 
 		cx.StmtTopDonated: `SELECT * FROM characters WHERE good_standing
-ORDER BY donated_isk DESC LIMIT 6`,
+ORDER BY donated_isk_30 DESC LIMIT 6`,
 
 		cx.StmtCharDetails: `SELECT * FROM characters
 WHERE character_id = :character_id LIMIT 1`,
@@ -106,8 +106,12 @@ WHERE character_id = :character_id`,
     alliance_id,
     received,
     received_isk,
+    received_30,
+    received_isk_30,
     donated,
     donated_isk,
+    donated_30,
+    donated_isk_30,
     last_donated,
     last_received,
     good_standing
@@ -117,8 +121,12 @@ WHERE character_id = :character_id`,
     :alliance_id,
     :received,
     :received_isk,
+    :received_30,
+    :received_isk_30,
     :donated,
     :donated_isk,
+    :donated_30,
+    :donated_isk_30,
     :last_donated,
     :last_received,
     :good_standing
@@ -129,8 +137,12 @@ WHERE character_id = :character_id`,
     alliance_id = :alliance_id,
     received = :received,
     received_isk = :received_isk,
+    received_30 = :received_30,
+    received_isk_30 = :received_isk_30,
     donated = :donated,
     donated_isk = :donated_isk,
+    donated_30 = :donated_30,
+    donated_isk_30 = :donated_isk_30,
     last_donated = :last_donated,
     last_received = :last_received,
     good_standing = :good_standing
@@ -176,6 +188,69 @@ WHERE character_id = :character_id`,
 			"SELECT * FROM donations WHERE receiver = %d AND donator = :character_id",
 			opts.CharacterID,
 		),
+
+		cx.StmtCreatePreferences: `INSERT INTO preferences (
+    character_id
+) VALUES (
+    :character_id
+)`,
+
+		cx.StmtGetPreferences: `SELECT * FROM preferences
+WHERE character_id = :character_id LIMIT 1`,
+
+		cx.StmtSetDonationPreferences: `UPDATE preferences SET
+    donation_rows = :rows,
+    donation_min = :minimum,
+    donation_header = :header,
+    donation_footer = :footer,
+    donation_pattern = :pattern,
+    donation_max_age = :max_age,
+    donation_passphrase = :passphrase
+WHERE character_id = :character_id`,
+
+		cx.StmtSetContractPreferences: `UPDATE preferences SET
+    contract_rows = :rows,
+    contract_min = :minimum,
+    contract_header = :header,
+    contract_footer = :footer,
+    contract_pattern = :pattern,
+    contract_max_age = :max_age,
+    contract_passphrase = :passphrase
+WHERE character_id = :character_id`,
+
+		cx.StmtGetOutstandingContracts: `SELECT * FROM contracts
+WHERE accepted = false AND receiver = :character_id LIMIT 100`,
+
+		cx.StmtAcceptContract: `UPDATE contracts SET
+    accepted = true
+WHERE contract_id = :contract_id AND receiver = :character_id`,
+
+		cx.StmtSetCombinedPreferences: `UPDATE preferences SET
+    combined_rows = :rows,
+    combined_min_donation = :donation_minimum,
+    combined_min_contract = :contract_minimum,
+    combined_header = :header,
+    combined_footer = :footer,
+    combined_donation_pattern = :donation_pattern,
+    combined_contract_pattern = :contract_pattern,
+    combined_max_age = :max_age,
+    combined_passphrase = :passphrase
+WHERE character_id = :character_id`,
+
+		cx.StmtGetStaleContracts: `SELECT * FROM contracts
+WHERE issued < NOW() - INTERVAL '30 days' LIMIT 100`,
+
+		cx.StmtGetStaleDonations: `SELECT * FROM donations
+WHERE "timestamp" < NOW() - INTERVAL '30 days' LIMIT 100`,
+
+		cx.StmtRemoveContract: `DELETE FROM contracts
+WHERE contract_id = :contract_id`,
+
+		cx.StmtRemoveContractItems: `DELETE FROM contractItems
+WHERE contract_id = :contract_id`,
+
+		cx.StmtRemoveDonation: `DELETE FROM donations
+WHERE transaction_id = :transaction_id`,
 	}
 
 	for key, query := range queries {

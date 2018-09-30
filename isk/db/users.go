@@ -67,7 +67,7 @@ func SaveUser(ctx context.Context, user *User) error {
 		return updateUser(ctx, user)
 	}
 
-	if err := deleteUser(ctx, user.CharacterID); err != nil {
+	if err := DeleteUser(ctx, user.CharacterID); err != nil {
 		log.Printf("failed to delete previous user: %+v", err)
 		return err
 	}
@@ -90,12 +90,17 @@ func updateUser(ctx context.Context, user *User) error {
 
 // save the newly created (or replaced) user
 func saveNewUser(ctx context.Context, user *User) error {
-	return executeNamed(ctx, cx.StmtCreateUser, map[string]interface{}{
+	if err := executeNamed(ctx, cx.StmtCreateUser, map[string]interface{}{
 		"character_id":   user.CharacterID,
 		"refresh_token":  user.RefreshToken,
 		"access_token":   user.AccessToken,
 		"access_expires": user.AccessExpires,
 		"owner_hash":     user.OwnerHash,
+	}); err != nil {
+		return err
+	}
+	return executeNamed(ctx, cx.StmtCreatePreferences, map[string]interface{}{
+		"character_id": user.CharacterID,
 	})
 }
 
@@ -136,7 +141,8 @@ func scanUsers(rows *sqlx.Rows) ([]*User, error) {
 	return users, nil
 }
 
-func deleteUser(ctx context.Context, charID int32) error {
+// DeleteUser removes a user (auth/tracked character)
+func DeleteUser(ctx context.Context, charID int32) error {
 	return executeNamed(
 		ctx,
 		cx.StmtDeleteUser,

@@ -14,8 +14,7 @@ import (
 // getNames for all characters involved in the donations
 func getNames(
 	ctx context.Context,
-	user *db.User,
-	donations []*db.Donation,
+	donations db.Donations,
 ) []*db.Affiliation {
 	affiliations := []*db.Affiliation{}
 	for _, donation := range donations {
@@ -41,11 +40,10 @@ func getNames(
 	return affiliations
 }
 
-// getNames for all characters involved in the donations
+// getContractNames for all characters involved in the contracts
 func getContractNames(
 	ctx context.Context,
-	user *db.User,
-	contracts []*db.Contract,
+	contracts db.Contracts,
 ) []*db.Affiliation {
 	affiliations := []*db.Affiliation{}
 	for _, contract := range contracts {

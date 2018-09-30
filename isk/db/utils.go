@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // adds the "postgres" driver to sql
@@ -91,4 +92,8 @@ func scan(rows *sqlx.Rows, newItem func() interface{}) ([]interface{}, error) {
 	}
 
 	return items, nil
+}
+
+func round2(n float64) float64 {
+	return math.Round(n*100) / 100
 }

@@ -10,7 +10,6 @@ import (
 // TopRecipients returns JSON describing the current top donation recipients
 func TopRecipients(ctx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, _req *http.Request) {
-		// XXX cache this
 		recipients, err := db.GetTopRecipients(ctx)
 		if err != nil {
 			write500(w)
@@ -28,6 +27,6 @@ func TopRecipients(ctx context.Context) http.HandlerFunc {
 			"donators":   donators,
 		}
 
-		writeJSON(w, res)
+		writeJSON(ctx, w, res)
 	}
 }

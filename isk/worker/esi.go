@@ -37,8 +37,8 @@ func addClient(ctx context.Context) context.Context {
 	return ctx
 }
 
-// WorkerContext adds the goesi client and auth to context
-func WorkerContext(ctx context.Context) context.Context {
+// Context adds the goesi client and auth to context
+func Context(ctx context.Context) context.Context {
 	ctx = context.WithValue(ctx, cx.DB, db.Connect(ctx))
 	ctx = context.WithValue(ctx, cx.Statements, db.GetStatements(ctx))
 
@@ -46,6 +46,12 @@ func WorkerContext(ctx context.Context) context.Context {
 	ctx = context.WithValue(ctx, cx.Cache, cache)
 
 	ctx = addClient(ctx)
+
+	prices, err := newPrices(ctx)
+	if err != nil {
+		log.Fatalf("failed to fetch initial market prices: %+v", err)
+	}
+	ctx = context.WithValue(ctx, cx.Prices, prices)
 
 	client := ctx.Value(cx.HTTPClient).(*http.Client)
 	opts := ctx.Value(cx.Opts).(*cx.Options)
@@ -63,11 +69,18 @@ func WorkerContext(ctx context.Context) context.Context {
 
 // Run -- main worker entry point -- this function does not return
 func Run(ctx context.Context) {
-	ctx = WorkerContext(ctx)
+	ctx = Context(ctx)
 
+	loop := 0
 	for {
 		updateStandings(ctx, processUsers(ctx))
 		time.Sleep(1 * time.Minute)
+		loop++
+		if loop%60 == 0 {
+			pruneContracts(ctx)
+			pruneDonations(ctx)
+			loop = 0
+		}
 	}
 }
 
@@ -88,16 +101,7 @@ func updateStandings(ctx context.Context, charIDs []int32) {
 			continue
 		}
 
-		donations, err := db.GetCharDonations(ctx, charID)
-		if err != nil {
-			continue
-		}
-
-		total := float64(0)
-		for _, donation := range donations {
-			total += donation.Amount
-		}
-		char.GoodStanding = standingISK > (total * float64(0.01))
+		char.GoodStanding = standingISK > (char.ReceivedISK30 * float64(0.01))
 
 		if err := db.SaveCharacter(ctx, char); err != nil {
 			log.Printf("failed to save character %d: %+v", charID, err)
@@ -120,7 +124,7 @@ func processUsers(ctx context.Context) []int32 {
 		if err != nil {
 			log.Printf("failed to get character auth: %+v", err)
 			// delete the character? or track failures then delete
-			return processed
+			continue
 		}
 
 		charIDs, err := pullCharacter(ctx, user)
@@ -191,17 +195,17 @@ func addCharacterAuth(
 func pullCharacter(ctx context.Context, user *db.User) ([]int32, error) {
 	log.Printf("pulling character: %d", user.CharacterID)
 
-	charIDs, err := pullCharacterWallet(ctx, user)
+	charIDs, err := characterWallet(ctx, user)
 	if err != nil {
 		return charIDs, err
 	}
 	log.Printf("pulled character wallet: %d", user.CharacterID)
 
-	// TODO: return charIDs and append in contracts
-	if err := pullCharacterContracts(ctx, user); err != nil {
+	contractCharIDs, err := characterContracts(ctx, user)
+	if err != nil {
 		return charIDs, err
 	}
 	log.Printf("pulled character contracts: %d", user.CharacterID)
 
-	return charIDs, db.SaveUser(ctx, user)
+	return append(charIDs, contractCharIDs...), db.SaveUser(ctx, user)
 }

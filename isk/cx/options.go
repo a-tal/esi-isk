@@ -14,12 +14,12 @@ import (
 
 // Options describes all runtime options for the API
 type Options struct {
-	Production, Debug, HTTPS bool
-	Port                     int
-	CharacterID              int32 // characterID of standings character
-	Hostname, ESI            string
-	DB                       *DBOptions
-	Auth                     *oauth2.Config
+	Production, Debug, HTTPS                bool
+	Port, CacheTime, CacheResp, MaxPrefRows int
+	CharacterID, MaxPrefLen, MaxPatternLen  int32
+	Hostname, ESI, AppSecret                string
+	DB                                      *DBOptions
+	Auth                                    *oauth2.Config
 }
 
 // DBOptions describes our database connection
@@ -58,7 +58,7 @@ func NewOptions(ctx context.Context) context.Context {
 	port := flag.Int("port", 8080, "backend port number")
 	user := flag.String("db-user", "esi-isk", "db user name")
 	host := flag.String("db-host", "postgres", "db host name")
-	passwd := flag.String("db-passwd", "default", "db user name")
+	passwd := flag.String("db-passwd", "default", "db user password")
 	name := flag.String("db-name", "esi-isk", "db name")
 	sslmode := flag.String("ssl-mode", "disable", "db ssl mode option")
 	debug := flag.Bool("debug", false, "enable debug mode")
@@ -68,6 +68,12 @@ func NewOptions(ctx context.Context) context.Context {
 	authConf := flag.String("auth", "/secret/sso.json", "path to auth config")
 	esi := flag.String("esi", "https://esi.evetech.net", "basepath for ESI")
 	characterID := flag.Int("character", 2114454465, "standings char ID")
+	cacheTime := flag.Int("cache-time", 300, "seconds to cache responses for")
+	cacheResp := flag.Int("cache-resp", 10000, "number of responses to cache")
+	appSecret := flag.String("app-secret", "not-secure", "app secret to use")
+	maxPrefLen := flag.Int("max-pref", 1500, "max length header/footer strings")
+	maxPatternLen := flag.Int("max-pattern", 500, "max length row pattern string")
+	maxPrefRows := flag.Int("max-rows", 100, "max number of rows to allow")
 
 	flag.Parse()
 
@@ -81,6 +87,8 @@ func NewOptions(ctx context.Context) context.Context {
 		Hostname:    *hostname,
 		Port:        *port,
 		CharacterID: int32(*characterID),
+		CacheTime:   *cacheTime,
+		CacheResp:   *cacheResp,
 		ESI:         *esi,
 		DB: &DBOptions{
 			Host:     *host,
@@ -89,7 +97,11 @@ func NewOptions(ctx context.Context) context.Context {
 			Name:     *name,
 			Mode:     *sslmode,
 		},
-		Auth: readAuthConf(ctx, *authConf),
+		Auth:          readAuthConf(ctx, *authConf),
+		AppSecret:     *appSecret,
+		MaxPrefLen:    int32(*maxPrefLen),
+		MaxPatternLen: int32(*maxPatternLen),
+		MaxPrefRows:   *maxPrefRows,
 	}
 
 	// HACK: remove once ccpgames/sso-issues#41 is done

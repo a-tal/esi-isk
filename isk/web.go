@@ -7,10 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	sessions "github.com/goincremental/negroni-sessions"
+	"github.com/goincremental/negroni-sessions/cookiestore"
 	"github.com/phyber/negroni-gzip/gzip"
 	"github.com/rs/cors"
 	"github.com/unrolled/secure"
 	"github.com/urfave/negroni"
+	cache "github.com/victorspringer/http-cache"
+	"github.com/victorspringer/http-cache/adapter/memory"
 	"gopkg.in/tylerb/graceful.v1"
 
 	"github.com/a-tal/esi-isk/isk/api"
@@ -31,6 +35,28 @@ func getAllowed(options *cx.Options) []string {
 	}
 }
 
+func getCache(ctx context.Context) (*cache.Client, cache.Adapter) {
+	opts := ctx.Value(cx.Opts).(*cx.Options)
+
+	adapter, err := memory.NewAdapter(
+		memory.AdapterWithAlgorithm(memory.LRU),
+		memory.AdapterWithCapacity(opts.CacheResp),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := cache.NewClient(
+		cache.ClientWithAdapter(adapter),
+		cache.ClientWithTTL(time.Duration(opts.CacheTime)*time.Second),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return client, adapter
+}
+
 // RunServer creates and runs the backend API server
 func RunServer(ctx context.Context) {
 
@@ -46,11 +72,14 @@ func RunServer(ctx context.Context) {
 
 	mux := http.NewServeMux()
 
-	allowed := getAllowed(opts)
+	respCache, adapter := getCache(ctx)
+	ctx = context.WithValue(ctx, cx.Adapter, adapter)
 
 	mux.HandleFunc("/api/ping", api.Ping)
-	mux.HandleFunc("/api/top", api.TopRecipients(ctx))
-	mux.HandleFunc("/api/char", api.CharacterDetails(ctx))
+	mux.Handle("/api/prefs", api.Preferences(ctx))
+	mux.Handle("/api/top", respCache.Middleware(api.TopRecipients(ctx)))
+	mux.Handle("/api/char", respCache.Middleware(api.CharacterDetails(ctx)))
+	mux.Handle("/api/custom", respCache.Middleware(api.Custom(ctx)))
 
 	mux.HandleFunc("/signup", api.NewLogin(ctx))
 	mux.HandleFunc("/callback", api.Callback(ctx))
@@ -60,26 +89,27 @@ func RunServer(ctx context.Context) {
 		negroni.NewLogger(),
 
 		negroni.HandlerFunc(secure.New(secure.Options{
-			FrameDeny:       true,
-			AllowedHosts:    allowed,
-			SSLRedirect:     opts.HTTPS,
-			SSLProxyHeaders: map[string]string{"X-Forwarded-Proto": "https"},
-			STSSeconds:      315360000,
-			IsDevelopment:   opts.Debug,
-			// ContentSecurityPolicy: "default-src 'self'",
+			FrameDeny:             true,
+			SSLProxyHeaders:       map[string]string{"X-Forwarded-Proto": "https"},
+			STSSeconds:            315360000,
+			IsDevelopment:         opts.Debug,
+			ContentSecurityPolicy: "default-src 'self' script-src 'unsafe-inline'",
 		}).HandlerFuncWithNext),
 
 		cors.New(cors.Options{
-			AllowedOrigins:         allowed,
+			AllowedOrigins:         getAllowed(opts),
 			AllowCredentials:       true,
 			AllowOriginRequestFunc: nil,
-			Debug: opts.Debug,
+			Debug:                  opts.Debug,
 		}),
 
 		gzip.Gzip(gzip.DefaultCompression),
 
 		negroni.NewStatic(http.Dir("public")),
 	)
+
+	store := cookiestore.New([]byte(opts.AppSecret))
+	middleware.Use(sessions.Sessions("esi-isk", store))
 
 	middleware.UseHandler(mux)
 
@@ -106,7 +136,7 @@ func InitialSetup(ctx context.Context) error {
 	if err == nil {
 		return nil
 	}
-	ctx = worker.WorkerContext(ctx)
+	ctx = worker.Context(ctx)
 
 	names, err := worker.ResolveName(ctx, opts.CharacterID)
 	if err != nil {

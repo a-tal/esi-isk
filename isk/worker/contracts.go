@@ -7,38 +7,151 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/antihax/goesi"
 	"github.com/antihax/goesi/esi"
 	"github.com/antihax/goesi/optional"
 
+	"github.com/a-tal/esi-isk/isk/api"
 	"github.com/a-tal/esi-isk/isk/cx"
 	"github.com/a-tal/esi-isk/isk/db"
 )
 
-func pullCharacterContracts(ctx context.Context, user *db.User) error {
-	// TODO need to check for contract's accepted status changing
+// marketPrices stores market prices from ESI in memory
+type marketPrices struct {
+	lock    *sync.Mutex
+	prices  map[int32]float64
+	expires time.Time
+}
+
+func newPrices(ctx context.Context) (*marketPrices, error) {
+	prices, expires, err := getPrices(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &marketPrices{
+		lock:    &sync.Mutex{},
+		prices:  prices,
+		expires: expires,
+	}
+	go m.updater(ctx)
+	return m, nil
+}
+
+func (m *marketPrices) value(items map[int32]int32) float64 {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	sum := float64(0)
+	for typeID, quantity := range items {
+		sum += (m.prices[typeID] * float64(quantity))
+	}
+	return sum
+}
+
+func (m *marketPrices) updater(ctx context.Context) {
+	minDt := time.Duration(60 * time.Second)
+
+	for {
+		dt := m.expires.Sub(time.Now().UTC())
+		if dt < minDt {
+			dt = minDt
+		}
+
+		log.Printf("next market update in: %+v", dt)
+		time.Sleep(dt)
+		log.Println("updating market prices")
+
+		prices, expires, err := getPrices(ctx)
+		if err != nil {
+			log.Printf("failed to update market prices: %+v", err)
+		} else {
+			m.lock.Lock()
+			m.prices = prices
+			m.expires = expires
+			m.lock.Unlock()
+		}
+	}
+}
+
+func getPrices(ctx context.Context) (
+	prices map[int32]float64,
+	expires time.Time,
+	err error,
+) {
+	client := ctx.Value(cx.Client).(*goesi.APIClient)
+	esiPrices, r, err := client.ESI.MarketApi.GetMarketsPrices(ctx, nil)
+	if err != nil {
+		return
+	}
+
+	expires, err = getExpires(r)
+	if err != nil {
+		return
+	}
+
+	prices = map[int32]float64{}
+	for _, i := range esiPrices {
+		prices[i.TypeId] = i.AdjustedPrice
+	}
+
+	return prices, expires, nil
+}
+
+// pull the next update time from the response headers
+func getExpires(r *http.Response) (expires time.Time, err error) {
+	expires, err = time.Parse(api.RFC1123, r.Header.Get("Expires"))
+	if err != nil {
+		return
+	}
+
+	return expires.Add(1 * time.Second), nil
+}
+
+func characterContracts(ctx context.Context, user *db.User) ([]int32, error) {
+	charIDs := []int32{}
 
 	contracts, err := getContracts(ctx, user)
 	if err != nil {
-		return err
+		return charIDs, err
 	}
 
 	sort.Sort(contracts)
 
+	prevID := int32(user.LastContractID.Int64)
+
 	setLastContractID(contracts, user)
 
-	donations := asDbContracts(ctx, parseForZeroISK(contracts, user))
+	outstanding, err := db.GetOutstandingContracts(ctx, user.CharacterID)
+	if err != nil {
+		return charIDs, err
+	}
 
-	// XXX should check all unaccepted contracts for this character
-	//     and update their status if changed. needs new query
+	new, updated := parseForZeroISK(contracts, user, prevID, outstanding)
+	donations, updates := asDbContracts(ctx, new, updated)
 
-	return saveContractRun(ctx, donations, getContractNames(ctx, user, donations))
+	if len(donations) > 0 {
+		charIDs = append(charIDs, user.CharacterID)
+	}
+
+	for _, donation := range donations {
+		charIDs = append(charIDs, donation.Donator)
+	}
+
+	return charIDs, saveContractRun(
+		ctx,
+		donations,
+		updates,
+		getContractNames(ctx, donations),
+	)
 }
 
 func saveContractRun(
 	ctx context.Context,
 	contracts []*db.Contract,
+	updates []*db.Contract,
 	affiliations []*db.Affiliation,
 ) error {
 	for _, contract := range contracts {
@@ -47,18 +160,25 @@ func saveContractRun(
 		}
 	}
 
+	if err := db.UpdateContracts(ctx, updates, affiliations); err != nil {
+		return err
+	}
+
 	if err := db.SaveNames(ctx, affiliations); err != nil {
 		return err
 	}
 
-	return db.SaveCharacterContracts(ctx, contracts, affiliations)
+	return db.SaveCharacterContracts(ctx, contracts, affiliations, true)
 }
 
-func getContractValue(items []*db.Item) float64 {
-	// TODO: pull value from evepraisal once they support item id posting
-	// https://github.com/evepraisal/go-evepraisal/issues/81
-	log.Println("todo: lookup price of %+v", items)
-	return 666.66
+func getContractValue(ctx context.Context, items []*db.Item) float64 {
+	itemQuantities := map[int32]int32{}
+	for _, item := range items {
+		itemQuantities[item.TypeID] += item.Quantity
+	}
+
+	m := ctx.Value(cx.Prices).(*marketPrices)
+	return m.value(itemQuantities)
 }
 
 func getContractItems(
@@ -124,29 +244,52 @@ func knownContract(
 ) bool {
 	hasLastID, lastID := getLastContractID(user)
 	for _, contract := range contracts {
-		if hasLastID && int64(contract.ContractId) == lastID {
+		if hasLastID && contract.ContractId == lastID {
 			return true
 		}
 	}
 	return false
 }
 
-func getLastContractID(user *db.User) (bool, int64) {
-	return user.LastContractID.Valid, user.LastContractID.Int64
+func getLastContractID(user *db.User) (bool, int32) {
+	return user.LastContractID.Valid, int32(user.LastContractID.Int64)
 }
 
 // parseForZeroISK finds contracts that are zero ISK item exchanges
 func parseForZeroISK(
 	contracts []esi.GetCharactersCharacterIdContracts200Ok,
 	user *db.User,
-) []esi.GetCharactersCharacterIdContracts200Ok {
-	zeroISK := []esi.GetCharactersCharacterIdContracts200Ok{}
+	prevID int32,
+	outstanding []int32,
+) (
+	new []esi.GetCharactersCharacterIdContracts200Ok,
+	updated []esi.GetCharactersCharacterIdContracts200Ok,
+) {
+	new = []esi.GetCharactersCharacterIdContracts200Ok{}
+	updated = []esi.GetCharactersCharacterIdContracts200Ok{}
+	newContracts := true
 	for _, contract := range contracts {
+		if contract.ContractId == prevID {
+			newContracts = false
+		}
 		if contract.Type_ == "item_exchange" && contract.Price == 0 {
-			zeroISK = append(zeroISK, contract)
+			if newContracts {
+				new = append(new, contract)
+			} else {
+				for i := 0; i < len(outstanding); i++ {
+					if outstanding[i] == contract.ContractId {
+						if contract.Status != "outstanding" {
+							log.Printf("outstanding contract %d has updated", contract.ContractId)
+							updated = append(updated, contract)
+						} else {
+							log.Printf("contract %d is still outstanding", contract.ContractId)
+						}
+					}
+				}
+			}
 		}
 	}
-	return zeroISK
+	return new, updated
 }
 
 func setLastContractID(contracts zeroISKContracts, user *db.User) {
@@ -237,11 +380,25 @@ func additionalContractPage(
 	return entries, err
 }
 
+func toDbContract(c esi.GetCharactersCharacterIdContracts200Ok) *db.Contract {
+	return &db.Contract{
+		ID:       c.ContractId,
+		Donator:  c.IssuerId,
+		Receiver: c.AssigneeId,
+		Location: c.StartLocationId,
+		Issued:   c.DateIssued,
+		Expires:  c.DateExpired,
+		Accepted: c.Status == "finished",
+		Note:     c.Title,
+	}
+}
+
 // asDbContracts fills in Items and Value and converts into *db.Contract
 func asDbContracts(
 	ctx context.Context,
 	contracts zeroISKContracts,
-) []*db.Contract {
+	updates zeroISKContracts,
+) ([]*db.Contract, []*db.Contract) {
 	zeroISK := []*db.Contract{}
 
 	for _, contract := range contracts {
@@ -255,19 +412,17 @@ func asDbContracts(
 			continue
 		}
 
-		zeroISK = append(zeroISK, &db.Contract{
-			ID:       contract.ContractId,
-			Donator:  contract.IssuerId,
-			Receiver: contract.AssigneeId,
-			Location: contract.StartLocationId,
-			Issued:   contract.DateIssued,
-			Expires:  contract.DateExpired,
-			Accepted: contract.Status == "finished",
-			Value:    getContractValue(items),
-			Note:     contract.Title,
-			Items:    items,
-		})
+		c := toDbContract(contract)
+		c.Value = getContractValue(ctx, items)
+		c.Items = items
+
+		zeroISK = append(zeroISK, c)
 	}
 
-	return zeroISK
+	updateContracts := []*db.Contract{}
+	for _, update := range updates {
+		updateContracts = append(updateContracts, toDbContract(update))
+	}
+
+	return zeroISK, updateContracts
 }

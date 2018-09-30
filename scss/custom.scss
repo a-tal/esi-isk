@@ -1,3 +1,5 @@
+@import "../node_modules/bootstrap/scss/bootstrap.scss";
+
 div#header > h1 > a,
 div#header > h1 > a:hover,
 div#header > h1 > a:focus {
@@ -16,4 +18,16 @@ a:hover, a:focus {
 
 .contract-expanded, .contract-collapsed {
   cursor: pointer;
+}
+
+.ribbon-black::before {
+  background-color: $dark !important;
+}
+
+.ribbon-green::before {
+  background-color: $success !important;
+}
+
+.ribbon-red::before {
+  background-color: $danger !important;
 }

@@ -24,6 +24,11 @@ build:
 	npm run build-css
 	npm run build
 
+production:
+	find public ! -name 'index.html' -type f -exec rm -f {} +
+	npm run build-css
+	npm run build-release
+
 vet:
 	go vet ${PKG_LIST}
 

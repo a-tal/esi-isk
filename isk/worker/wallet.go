@@ -15,7 +15,7 @@ import (
 	"github.com/a-tal/esi-isk/isk/db"
 )
 
-func pullCharacterWallet(ctx context.Context, user *db.User) ([]int32, error) {
+func characterWallet(ctx context.Context, user *db.User) ([]int32, error) {
 	charIDs := []int32{}
 
 	entries, err := getWalletJournal(ctx, user)
@@ -37,7 +37,7 @@ func pullCharacterWallet(ctx context.Context, user *db.User) ([]int32, error) {
 
 	setLastJournalID(entries, user)
 
-	return charIDs, saveWalletRun(ctx, donations, getNames(ctx, user, donations))
+	return charIDs, saveWalletRun(ctx, donations, getNames(ctx, donations))
 }
 
 func getWalletJournal(
@@ -111,7 +111,7 @@ func saveWalletRun(
 		return err
 	}
 
-	return db.SaveCharacterDonations(ctx, donations, affiliations)
+	return db.SaveCharacterDonations(ctx, donations, affiliations, true)
 }
 
 type walletDonationEntries []esi.GetCharactersCharacterIdWalletJournal200Ok

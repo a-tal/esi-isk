@@ -1,8 +1,8 @@
 import(/* webpackPreload: true */ 'jquery');
 import(/* webpackPreload: true */ 'bootstrap');
-import(/* webpackPreload: true */ 'bootstrap/dist/css/bootstrap.min.css');
 import(/* webpackPreload: true */ 'github-fork-ribbon-css/gh-fork-ribbon.css');
 
+import Cookie from 'js-cookie';
 import { pad } from './utils';
 
 function header() {
@@ -30,17 +30,43 @@ function header() {
 }
 
 // create & return the sign in/up div
-function signup() {
+function signup(prefs, hasCookie) {
+  let details = signupDetails(prefs, hasCookie);
   let signupLink = document.createElement('a');
   signupLink.id = 'signup';
-  signupLink.href = '/signup';
+  signupLink.href = details.target;
   signupLink.classList.add('github-fork-ribbon');
   signupLink.classList.add('right-top');
-  signupLink.innerHTML = 'sign up';
-  signupLink.title = 'sign up';
-  signupLink.setAttribute('data-ribbon', 'sign up');
+  signupLink.classList.add(details.cls);
+  signupLink.innerHTML = details.content;
+  signupLink.title = details.content;
+  signupLink.setAttribute('data-ribbon', details.content);
 
   return signupLink;
+}
+
+function signupDetails(prefs, hasCookie) {
+  let target = "/signup";
+  let content = "sign up";
+  let cls = "ribbon-red";
+
+  if (hasCookie) {
+    if (prefs != undefined) {
+      target = 'javascript:window.l()';
+      content = "log out";
+      cls = "ribbon-black";
+    } else {
+      target = 'javascript:window.p()';
+      content = "preferences";
+      cls = "ribbon-green";
+    }
+  }
+
+  return {
+    target: target,
+    content: content,
+    cls: cls
+  };
 }
 
 // create & return the top recipients div
@@ -130,10 +156,34 @@ function characterDiv(charID, charName, isk) {
   return div
 }
 
+function setSignupBanner() {
+  let s = document.getElementById('signup');
+  let urlParams = new URLSearchParams(window.location.hash.substr(1));
+  let details = signupDetails(urlParams.get('prefs'), loggedIn());
+
+  s.href = details.target;
+  s.title = details.content;
+  s.innerHTML = details.content;
+  s.setAttribute('data-ribbon', details.content);
+  s.classList.add(details.cls);
+
+  let availCls = ['ribbon-black', 'ribbon-green', 'ribbon-red'];
+  for (let i = 0; i < availCls.length; i++) {
+    if (details.cls != availCls[i]) {
+      s.classList.remove(availCls[i]);
+    }
+  }
+}
+
 // returns the cleared body div
 function clearBodyDiv() {
+  setSignupBanner();
+  let prevAlert = document.getElementsByClassName('alert');
+  for (; prevAlert.length > 0;) {
+    prevAlert[0].remove();
+  }
   let body = document.getElementById('body');
-  for (let i = 0; i <= body.children.length; i++) {
+  for (; body.children.length > 0;) {
     body.children[0].remove();
   }
   return body;
@@ -141,16 +191,49 @@ function clearBodyDiv() {
 
 // exposed as window.c because reasons
 function switchCharacterView(charID) {
+  window.location.hash = '#c=' + charID;
   let body = clearBodyDiv();
   body.appendChild(characterViewDiv(charID));
-  window.history.pushState(window.history.state, "ESI ISK - " + charID, '/?c=' + charID);
 }
 
 // exposed as window.m because reasons
 function switchToMainPage() {
+  window.location.hash = '';
   let body = clearBodyDiv();
   body.appendChild(getTop());
-  window.history.pushState(window.history.state, "ESI ISK", '/');
+}
+
+// exposed as window.p because reasons
+function switchToPrefs(prefType, charID) {
+  prefType = validPrefType(prefType)
+  let hash = '#prefs&t=' + prefType;
+  if (setCharID(charID)) {
+    hash += '&c=' + charID;
+  }
+  window.location.hash = hash;
+  let body = clearBodyDiv();
+  body.appendChild(prefsView(prefType, charID));
+}
+
+function setCharID(charID) {
+  // this is insecure, it's only for display purposes tho
+  if (charID != undefined && charID > 0) {
+    Cookie.set('charID', charID);
+    return true;
+  }
+  return false;
+}
+
+// exposed as window.l because reasons
+function logout() {
+  delCookie();
+  createAlert('You have been logged out', 'success');
+  switchToMainPage();
+}
+
+function delCookie() {
+  Cookie.remove('charID');
+  document.cookie = 'esi-isk=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 }
 
 function frontPage() {
@@ -228,8 +311,6 @@ function contractsTable() {
   let header = document.createElement('thead');
   let headerRow = document.createElement('tr');
 
-  // XXX ADD CONTRACT ITEMS -- NESTED ON CLICK IDEALLY
-
   headerRow.appendChild(createTableHeader("Donator"));
   headerRow.appendChild(createTableHeader("Value"));
   headerRow.appendChild(createTableHeader("Note"));
@@ -253,8 +334,6 @@ function contractedTable() {
 
   let header = document.createElement('thead');
   let headerRow = document.createElement('tr');
-
-  // XXX ADD CONTRACT ITEMS -- NESTED ON CLICK IDEALLY
 
   headerRow.appendChild(createTableHeader("Receiver"));
   headerRow.appendChild(createTableHeader("Value"));
@@ -343,8 +422,6 @@ function contractRow(d, donation) {
   row.appendChild(createTD(d.expires));
 
   row.classList.add('contract-collapsed');
-  // XXX if this could work that'd be neat
-  // row.setAttribute('data-toggle', 'tooltip');
   row.title = 'click to expand/collapse';
   return row
 }
@@ -481,8 +558,16 @@ function characterViewDiv(charID) {
   let donated = donatedTable();
   let contracted = contractedTable();
 
+  let urlParams = new URLSearchParams(window.location.hash.substr(1));
+  let passphrase = urlParams.get('p');
+
+  let url = '/api/char?c=' + charID;
+  if (passphrase != undefined && passphrase != '') {
+    url += '&p=' + passphrase;
+  }
+
   jQuery.ajax({
-    url: "/api/char?c=" + charID,
+    url: url,
     success: function(t) {
       charImg.getElementsByTagName('p')[0].innerHTML = t.character.name;
       if (t.character.good_standing == true) {
@@ -526,7 +611,15 @@ function characterViewDiv(charID) {
       }
 
     },
-    // XXX handle failure here
+
+    error: function(r, s, e) {
+      if (r.status == 403) {
+        createAlert('This is a private profile', 'warning');
+      } else {
+        console.log(r.status + ' ' + e);
+        createAlert('Failed to get details for ' + charID, 'warning');
+      }
+    },
   });
 
   return details;
@@ -537,14 +630,14 @@ function displayTable(details, parent, title, array, genFunc, donation, colSpan=
   details.appendChild(parent);
   let day = 0;
 
-  for (let i=array.length-1; i >= 0; i--) {
+  for (let i=0; i < array.length; i++) {
     let thisDay = new Date(array[i].timestamp || array[i].issued);
     if (thisDay.getUTCDate() != day) {
       day = thisDay.getUTCDate();
       parent.tBodies[0].appendChild(dayRow(thisDay, colSpan));
     }
     parent.tBodies[0].appendChild(genFunc(array[i], donation));
-    // XXX HACKHACKHACKHACKHACKHACKHACK XXX
+    // XXX this is hacky, should be more explicit here
     if (colSpan != 4) {
       parent.tBodies[0].appendChild(contractItems(array[i]));
     }
@@ -565,21 +658,539 @@ function footer() {
   return footer;
 }
 
+function formInput(id, label, name, value, placeholder, details, modifier) {
+  let iDiv = document.createElement('div');
+  iDiv.classList.add('form-group');
+
+  let iLabel = document.createElement('label');
+  iLabel.for = id;
+  iLabel.innerHTML = label;
+  iDiv.appendChild(iLabel);
+
+  let i = document.createElement('input');
+  i.name = name;
+  i.value = value || '';
+  i.id = id;
+  i.classList.add('form-control');
+  i.placeholder = placeholder;
+  i.setAttribute('aria-describedby', id + '-details');
+  if (modifier != undefined) {
+   modifier(i);
+  }
+  iDiv.appendChild(i);
+
+  let iDetails = document.createElement('small');
+  iDetails.classList.add('form-text');
+  iDetails.classList.add('text-muted');
+  iDetails.innerHTML = details;
+  iDetails.id = id + '-details';
+  iDiv.appendChild(iDetails);
+
+  return iDiv;
+}
+
+function formRow(columns, modifier) {
+  let row = document.createElement('div');
+  row.className = 'row';
+
+  for (let i = 0; i < columns.length; i++) {
+   let col = document.createElement('div');
+   col.className = 'col';
+   if (modifier != undefined) {
+     modifier(col)
+   }
+   col.appendChild(columns[i]);
+   row.appendChild(col);
+  }
+
+  return row;
+}
+
+function validPrefType(prefType) {
+  if (prefType != 'c' && prefType != 'd' && prefType != 'a') {
+   prefType = 'd';
+  }
+  return prefType
+}
+
+function prefsView(prefType, char) {
+  prefType = validPrefType(prefType)
+
+  let charID = char || Cookie.get('charID') || 'charID';
+
+  let container = document.createElement('div');
+  container.className = 'container-fluid';
+  container.id = 'body';
+
+  let header = document.createElement('h3');
+  header.classList.add('text-muted');
+  header.classList.add('text-center');
+
+  let url = document.createElement('h4');
+  url.classList.add('text-muted');
+  url.classList.add('text-center');
+  url.classList.add('pt-4');
+  url.classList.add('pb-2');
+  let link = document.createElement('a');
+  let href = document.location.origin + '/api/custom?t=' + prefType + '&c=' + charID;
+  link.href = href;
+  link.innerHTML = href;
+  link.target = "_blank";
+  url.appendChild(link);
+
+  let form = document.createElement('form');
+  form.id = 'prefs';
+  form.action = 'javascript:window.P("' + prefType + '")';
+
+  container.appendChild(header);
+  container.appendChild(form);
+  container.appendChild(url);
+
+  let typeName = 'Donation';
+
+  let switchType = 'c';
+  let switchText = 'Contracts';
+
+  let combinedType = 'a';
+  let combinedText = 'Combined';
+
+  switch (prefType) {
+    case 'c':
+      typeName = 'Contract';
+      switchType = 'd';
+      switchText = 'Donations';
+      break;
+
+    case 'a':
+      typeName = 'Combined';
+      combinedType = 'c';
+      combinedText = 'Contracts'
+      switchType = 'd';
+      switchText = 'Donations';
+      break;
+  }
+
+  header.innerHTML = typeName + ' preferences';
+
+  jQuery.ajax({
+    url: "/api/prefs?t=" + prefType,
+    success: function(t) {
+      if (prefType == 'c' || prefType == 'd') {
+        buildPrefsForm(form, t);
+      } else {
+        buildCombinedPrefsForm(form, t);
+      }
+      addPrefsButtons(form, switchType, switchText, combinedType, combinedText);
+      updateExampleURL(link, charID, prefType, t);
+    },
+    error: function(r, s, e) {
+      console.log('Status: ' + s + ' Error: ' + e);
+      console.log(r);
+      createAlert(
+        'Failed to get ' + typeName.toLowerCase() + ' preferences',
+        'warning'
+      );
+    },
+  });
+
+  return container;
+}
+
+function updateExampleURL(link, charID, prefType, t) {
+  let href = document.location.origin + '/api/custom?t=' + prefType + '&c=' + charID;
+
+  let passphrase = t.passphrase;
+  if (prefType == 'a') {
+    passphrase = t.donations.passphrase;
+  }
+
+  if (passphrase != "" && passphrase != undefined) {
+    href += '&p=' + passphrase;
+  }
+
+  link.href = href;
+  link.innerHTML = href;
+}
+
+function buildCombinedPrefsForm(form, t) {
+  addPrefsHeaderFooter(form, t.donations.header, t.donations.footer);
+  form.appendChild(formRow([
+    formInput(
+      'pref-donation-pattern',
+      'Donation pattern',
+      'donation_pattern',
+      t.donations.pattern,
+      'enter a custom row pattern for donations',
+      patternHelp(),
+    ),
+    formInput(
+      'pref-contract-pattern',
+      'Contract pattern',
+      'contract_pattern',
+      t.contracts.pattern,
+      'enter a custom row pattern for contracts',
+      patternHelp(),
+    ),
+  ]));
+
+  form.appendChild(formRow([
+    formInput(
+      'pref-rows',
+      'Rows',
+      'rows',
+      t.donations.rows,
+      '',
+      'number of rows to display',
+      function (i) {
+        i.type = 'number';
+        i.min = 1;
+        i.step = 1;
+      },
+    ),
+    formInput(
+      'pref-donation-minimum',
+      'Donation minimum',
+      'donation_minimum',
+      t.donations.minimum,
+      '',
+      'Minimum ISK value to include for donations',
+      function (i) {
+        i.type = 'number';
+        i.min = 0;
+        i.step = 0.1;
+      },
+    ),
+    formInput(
+      'pref-contract-minimum',
+      'Contract minimum',
+      'contract_minimum',
+      t.contracts.minimum,
+      '',
+      'Minimum ISK value to include for contracts',
+      function (i) {
+        i.type = 'number';
+        i.min = 0;
+        i.step = 0.1;
+      },
+    )
+  ]));
+
+  addPrefsMaxAgePassphrase(form, t.donations.max_age, t.donations.passphrase);
+}
+
+function patternHelp() {
+  return 'HTML will be stripped. <a href="https://github.com/a-tal/esi-isk/blob/master/README.md#Formatting">Formatting help</a>';
+}
+
+function buildPrefsForm(form, t) {
+  addPrefsHeaderFooter(form, t.header, t.footer);
+
+  form.appendChild(formRow([formInput(
+    'pref-pattern',
+    'Pattern',
+    'pattern',
+    t.pattern,
+    'enter a custom row pattern',
+    patternHelp(),
+  )]));
+
+  form.appendChild(formRow([
+    formInput(
+      'pref-rows',
+      'Rows',
+      'rows',
+      t.rows,
+      '',
+      'number of rows to display',
+      function (i) {
+        i.type = 'number';
+        i.min = 1;
+        i.step = 1;
+      },
+    ),
+    formInput(
+      'pref-minimum',
+      'Minimum',
+      'minimum',
+      t.minimum,
+      '',
+      'Minimum ISK value to include',
+      function (i) {
+        i.type = 'number';
+        i.min = 0;
+        i.step = 0.1;
+      },
+    )
+  ]));
+
+  addPrefsMaxAgePassphrase(form, t.max_age, t.passphrase);
+}
+
+function addPrefsMaxAgePassphrase(form, maxAge, passphrase) {
+  form.appendChild(formRow([
+    formInput(
+      'pref-max-age',
+      'Max Age',
+      'max_age',
+      maxAge,
+      '',
+      'Maximum age of donations to include (seconds)',
+      function (i) {
+        i.type = 'number';
+        i.min = 1;
+        i.step = 1;
+      },
+    ),
+    formInput(
+      'pref-passphrase',
+      'Passphrase',
+      'passphrase',
+      passphrase,
+      'optional passphrase to require',
+      'Optional passphrase',
+    )
+  ]));
+}
+
+function addPrefsButtons(form, switchType, switchText, combinedType, combinedText) {
+  let link = document.createElement('a');
+  link.classList.add('btn');
+  link.classList.add('btn-primary');
+  link.href = 'javascript:window.p("' + switchType + '");';
+  link.setAttribute('role', 'button');
+  link.innerHTML = switchText;
+
+  let combined = document.createElement('a');
+  combined.classList.add('btn');
+  combined.classList.add('btn-primary');
+  combined.href = 'javascript:window.p("' + combinedType + '");';
+  combined.setAttribute('role', 'button');
+  combined.innerHTML = combinedText;
+
+  let button = document.createElement('button');
+  button.type = 'submit';
+  button.innerHTML = 'Submit';
+  button.classList.add("btn");
+  button.classList.add("btn-primary");
+
+  let count = 0;
+  form.appendChild(formRow([link, combined, button], function (c) {
+    c.classList.add('d-flex');
+    if (count > 1) {
+      c.classList.add('justify-content-end');
+    } else if (count > 0) {
+      c.classList.add('justify-content-center');
+    } else {
+      c.classList.add('justify-content-start');
+    }
+    count++;
+  }));
+}
+
+function addPrefsHeaderFooter(form, header, footer) {
+  form.appendChild(formRow([
+    formInput(
+      'pref-header',
+      'Header',
+      'header',
+      header,
+      'enter a custom header',
+      'HTML will be stripped',
+    ),
+    formInput(
+      'pref-footer',
+      'Footer',
+      'footer',
+      footer,
+      'enter a custom footer',
+      'HTML will be stripped',
+    )
+  ]));
+}
+
+function buildPrefsPost(prefType) {
+  if (prefType == 'a') {
+    return combinedPrefsPost()
+  } else {
+    return singularPrefsPost()
+  }
+}
+
+function combinedPrefsPost() {
+  let data = {
+    "donations": {
+      "pattern": document.getElementById('pref-donation-pattern').value,
+      "rows": parseInt(document.getElementById('pref-rows').value),
+      "minimum": parseFloat(document.getElementById('pref-donation-minimum').value),
+      "max_age": parseInt(document.getElementById('pref-max-age').value)
+    },
+    "contracts": {
+      "pattern": document.getElementById('pref-contract-pattern').value,
+      "minimum": parseFloat(document.getElementById('pref-contract-minimum').value)
+    }
+  }
+
+  let header = document.getElementById('pref-header').value;
+  let footer = document.getElementById('pref-footer').value;
+  let passphrase = document.getElementById('pref-passphrase').value
+
+  if (header != undefined && header != '') {
+    data.donations["header"] = header;
+  }
+  if (footer != undefined && footer != '') {
+    data.donations["footer"] = footer;
+  }
+  if (passphrase != undefined && passphrase != '') {
+    data.donations["passphrase"] = passphrase;
+  }
+
+  return data
+}
+
+function singularPrefsPost() {
+  let data = {
+    "pattern": document.getElementById('pref-pattern').value,
+    "rows": parseInt(document.getElementById('pref-rows').value),
+    "minimum": parseFloat(document.getElementById('pref-minimum').value),
+    "max_age": parseInt(document.getElementById('pref-max-age').value)
+  };
+
+  let header = document.getElementById('pref-header').value;
+  let footer = document.getElementById('pref-footer').value;
+  let passphrase = document.getElementById('pref-passphrase').value
+
+  if (header != undefined && header != '') {
+    data["header"] = header;
+  }
+  if (footer != undefined && footer != '') {
+    data["footer"] = footer;
+  }
+  if (passphrase != undefined && passphrase != '') {
+    data["passphrase"] = passphrase;
+  }
+
+  return data
+}
+
+function postPrefs(prefType) {
+  prefType = validPrefType(prefType)
+
+  let typeName = 'Donation';
+  if (prefType == 'c') {
+    typeName = 'Contract';
+  } else if (prefType == 'a') {
+    typeName = 'Combined';
+  }
+
+  $.ajax({
+    type: "POST",
+    url: "/api/prefs?t=" + prefType,
+    data: JSON.stringify(buildPrefsPost(prefType)),
+    success: function() {
+      createAlert(typeName + ' preferences saved');
+      switchToPrefs(prefType);
+    },
+    error: function(r, s, e) {
+      console.log('Status: ' + s + ' Error: ' + e);
+      console.log(r);
+      createAlert(
+        'Failed to save ' + typeName.toLowerCase() + ' preferences',
+        'warning'
+      );
+    },
+    dataType: "json",
+    contentType: "application/json"
+  });
+}
+
+function closeSpan() {
+ let span = document.createElement('span');
+ span.setAttribute('aria-hidden', 'true');
+ span.innerHTML = '&times;';
+ return span;
+}
+
+function createAlert(msg, cls) {
+  let prevAlert = document.getElementsByClassName('alert');
+  let alertCls = cls || 'primary';
+
+  if (prevAlert.length < 1) {
+    let alert = document.createElement('div');
+    alert.classList.add('alert');
+    alert.classList.add('alert-' + alertCls);
+    alert.classList.add('alert-dismissible');
+    alert.classList.add('fade');
+    alert.classList.add('show');
+    alert.classList.add('position-fixed');
+    alert.classList.add('w-25');
+    alert.classList.add('mt-1');
+    alert.setAttribute('role', 'alert');
+    alert.innerHTML = msg;
+
+    let closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'close';
+    closeBtn.setAttribute('data-dismiss', 'alert');
+    closeBtn.setAttribute('aria-label', 'Close');
+
+    closeBtn.appendChild(closeSpan());
+    alert.appendChild(closeBtn);
+
+    let container = document.getElementById('container');
+    container.insertBefore(alert, container.childNodes[0]);
+  } else {
+    let alert = prevAlert[0];
+    alert.innerText = msg;
+    if (!alert.classList.contains('alert-' + alertCls)) {
+      alert.classList.add('alert-' + alertCls)
+      let avail = ['primary', 'secondary', 'success', 'danger', 'warning',
+                   'info', 'light', 'dark'];
+      for (let i = 0; i < avail.length; i++) {
+        if (avail[i] != alertCls) {
+          alert.classList.remove('alert-' + avail[i]);
+        }
+      }
+    }
+  }
+}
+
+// NB: this does not confirm the user isn't a hax0rman
+function loggedIn() {
+  if (document.cookie != undefined) {
+    return document.cookie.split('=')[0] == 'esi-isk';
+  }
+  return false;
+}
+
 function content() {
   let container = document.createElement('div');
   container.id = "container";
   container.className = 'container-fluid';
 
-  container.appendChild(signup());
+  let urlParams = new URLSearchParams(window.location.hash.substr(1));
+  let prefs = urlParams.get('prefs');
+  let logout = urlParams.get('logout');
+  let hasCookie = loggedIn();
+
+  container.appendChild(signup(prefs, hasCookie));
   container.appendChild(header());
 
-  var urlParams = new URLSearchParams(window.location.search);
-  var charID = urlParams.get('c');
+  if (logout != undefined && hasCookie) {
+    delCookie();
+    hasCookie = false;
+  }
 
-  if (charID != undefined) {
-    container.appendChild(characterView(charID));
+  if (prefs != undefined && hasCookie) {
+    let charID = urlParams.get('c');
+    setCharID(charID);
+    container.appendChild(prefsView(urlParams.get('t'), charID));
   } else {
-    container.appendChild(frontPage());
+    var charID = urlParams.get('c');
+    if (charID != undefined) {
+      container.appendChild(characterView(charID));
+    } else {
+      container.appendChild(frontPage());
+    }
   }
 
   container.appendChild(footer());
@@ -591,6 +1202,9 @@ jQuery(function($){
   document.body.appendChild(content());
   window.c = switchCharacterView;
   window.m = switchToMainPage;
+  window.p = switchToPrefs;
+  window.P = postPrefs;
+  window.l = logout;
 
   $(document).on("click", ".contract-collapsed", function(e) {
     let target = e.target;
@@ -614,5 +1228,5 @@ jQuery(function($){
     table.classList.remove('d-table');
     target.classList.add("contract-collapsed");
     target.classList.remove("contract-expanded");
-  })
+  });
 });

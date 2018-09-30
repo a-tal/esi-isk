@@ -85,7 +85,7 @@ func GetNames(ctx context.Context, ids ...int32) (map[int32]string, error) {
 	names := map[int32]string{}
 
 	for _, id := range ids {
-		name, err := getName(ctx, id)
+		name, err := GetName(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +95,8 @@ func GetNames(ctx context.Context, ids ...int32) (map[int32]string, error) {
 	return names, nil
 }
 
-func getName(ctx context.Context, id int32) (string, error) {
+// GetName returns the name for a single character ID from the DB
+func GetName(ctx context.Context, id int32) (string, error) {
 	name := &Name{}
 	values := map[string]interface{}{"id": id}
 	if err := getNamedResult(ctx, cx.StmtGetName, name, values); err != nil {

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/a-tal/esi-isk/isk/cx"
@@ -28,13 +29,22 @@ type Donation struct {
 	Amount float64 `db:"amount" json:"amount"`
 }
 
+// Donations are time sorted
+type Donations []*Donation
+
+func (d Donations) Len() int      { return len(d) }
+func (d Donations) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
+func (d Donations) Less(i, j int) bool {
+	return d[i].Timestamp.After(d[j].Timestamp)
+}
+
 // GetCharDonations returns donations FOR the character
-func GetCharDonations(ctx context.Context, charID int32) ([]*Donation, error) {
+func GetCharDonations(ctx context.Context, charID int32) (Donations, error) {
 	return getDonations(ctx, charID, cx.StmtCharDonations)
 }
 
 // GetCharDonated returns donations FROM the character
-func GetCharDonated(ctx context.Context, charID int32) ([]*Donation, error) {
+func GetCharDonated(ctx context.Context, charID int32) (Donations, error) {
 	return getDonations(ctx, charID, cx.StmtCharDonated)
 }
 
@@ -52,8 +62,27 @@ func GetCharStandingISK(ctx context.Context, charID int32) (float64, error) {
 	return total, nil
 }
 
+// GetStaleDonations returns donations from more than 30 days ago
+func GetStaleDonations(ctx context.Context) (Donations, error) {
+	rows, err := queryNamedResult(ctx, cx.StmtGetStaleDonations, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := scan(rows, func() interface{} { return &Donation{} })
+	if err != nil {
+		return nil, err
+	}
+	donations := Donations{}
+	for _, i := range res {
+		donations = append(donations, i.(*Donation))
+	}
+
+	return donations, nil
+}
+
 func getDonations(ctx context.Context, charID int32, key cx.Key) (
-	[]*Donation,
+	Donations,
 	error,
 ) {
 	rows, err := queryNamedResult(ctx, key, map[string]interface{}{
@@ -68,10 +97,14 @@ func getDonations(ctx context.Context, charID int32, key cx.Key) (
 	if err != nil {
 		return nil, err
 	}
-	donations := []*Donation{}
+	donations := Donations{}
 	for _, i := range res {
-		donations = append(donations, i.(*Donation))
+		d := i.(*Donation)
+		d.Amount = round2(d.Amount)
+		donations = append(donations, d)
 	}
+
+	sort.Sort(donations)
 	return donations, nil
 }
 
@@ -84,5 +117,12 @@ func SaveDonation(ctx context.Context, donation *Donation) error {
 		"timestamp":      donation.Timestamp,
 		"note":           donation.Note,
 		"amount":         donation.Amount,
+	})
+}
+
+// PruneDonation removes a donation by ID
+func PruneDonation(ctx context.Context, donation *Donation) error {
+	return executeNamed(ctx, cx.StmtRemoveDonation, map[string]interface{}{
+		"transaction_id": donation.ID,
 	})
 }

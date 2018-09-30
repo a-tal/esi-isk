@@ -3,7 +3,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4b1663f30b2eef42f32c3e28aa0e95ff013f277ebb9c8c157738c38026f77aeb"
+  digest = "1:2595232bd26298da27844156f74bc0b62507f17cc19b332ed76ad2497370909c"
   name = "github.com/antihax/goesi"
   packages = [
     ".",
@@ -12,7 +12,7 @@
     "optional",
   ]
   pruneopts = "UT"
-  revision = "2862b9e167c0a8521163ea5b74982dfbe127e9a2"
+  revision = "c2f239c17b62fc96c8b15eca98e58a16867cbee4"
 
 [[projects]]
   digest = "1:f6e5e1bc64c2908167e6aa9a1fe0c084d515132a1c63ad5b6c84036aa06dc0c1"
@@ -23,12 +23,47 @@
   version = "v2.0.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:fb694931d450f8719dfa1b7f2838c37e21313be87d1c711d496a2f429290bc6e"
+  name = "github.com/goincremental/negroni-sessions"
+  packages = [
+    ".",
+    "cookiestore",
+  ]
+  pruneopts = "UT"
+  revision = "40b49004abeec57f602bad8509521a865b2be95e"
+
+[[projects]]
   digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = "UT"
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
   version = "v1.2.0"
+
+[[projects]]
+  digest = "1:c79fb010be38a59d657c48c6ba1d003a8aa651fa56b579d959d74573b7dff8e1"
+  name = "github.com/gorilla/context"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
+  version = "v1.1.1"
+
+[[projects]]
+  digest = "1:e72d1ebb8d395cf9f346fd9cbc652e5ae222dd85e0ac842dc57f175abed6d195"
+  name = "github.com/gorilla/securecookie"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "e59506cc896acb7f7bf732d4fdf5e25f7ccd8983"
+  version = "v1.1.1"
+
+[[projects]]
+  digest = "1:0aa142ca3543fa3aca344c2fa2d52e01d706a3ce4e1fa893e0ef29b5349ddf7a"
+  name = "github.com/gorilla/sessions"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "81547393f870a35be888759a606ba7bf71dbe5c7"
+  version = "v1.1.2"
 
 [[projects]]
   branch = "master"
@@ -110,11 +145,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:9624432019da6390fc19bd6ef16d110efb7bee291f1d9048273ab229fcb2bea1"
+  digest = "1:9c925ffd312d54448ccdef74e6dcaba38d24c416d1dc20da60706cd58446f6ae"
   name = "github.com/unrolled/secure"
   packages = ["."]
   pruneopts = "UT"
-  revision = "8287f3899c8e3d490748e18fe7d438629132914e"
+  revision = "f340ee86eb8bb577158a1570ac8f37b63438b1bd"
 
 [[projects]]
   digest = "1:606d068450c82b9ddaa21de992f73563754077f0f411235cdfe71d0903a268c3"
@@ -126,6 +161,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:a3d147ff19bcb4949457155e480bb5c7ac0dd64e207e05700df82cf639b03a14"
+  name = "github.com/victorspringer/http-cache"
+  packages = [
+    ".",
+    "adapter/memory",
+  ]
+  pruneopts = "UT"
+  revision = "74620151b84f90295724ff7cf5cbed835230b811"
+
+[[projects]]
+  branch = "master"
   digest = "1:b8fa1ff0fc20983395978b3f771bb10438accbfe19326b02e236c1d4bf1c91b2"
   name = "golang.org/x/crypto"
   packages = [
@@ -134,7 +180,7 @@
     "pbkdf2",
   ]
   pruneopts = "UT"
-  revision = "0709b304e793a5edb4a2c0145f281ecdc20838a4"
+  revision = "5295e8364332db77d75fce11f1d19c053919a9c9"
 
 [[projects]]
   branch = "master"
@@ -145,7 +191,7 @@
     "context/ctxhttp",
   ]
   pruneopts = "UT"
-  revision = "8a410e7b638dca158bf9e766925842f6651ff828"
+  revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
 
 [[projects]]
   branch = "master"
@@ -159,7 +205,28 @@
   revision = "d2e6202438beef2727060aa7cabdd924d92ebfd9"
 
 [[projects]]
-  digest = "1:328b5e4f197d928c444a51a75385f4b978915c0e75521f0ad6a3db976c97a7d3"
+  digest = "1:b154eb17b54cec56332bb76d6b5cf1b23f96beaf19468d0da5e94fc737a9093d"
+  name = "golang.org/x/text"
+  packages = [
+    "feature/plural",
+    "internal",
+    "internal/catmsg",
+    "internal/format",
+    "internal/gen",
+    "internal/number",
+    "internal/stringset",
+    "internal/tag",
+    "language",
+    "message",
+    "message/catalog",
+    "unicode/cldr",
+  ]
+  pruneopts = "UT"
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
+
+[[projects]]
+  digest = "1:6247f76e55a1e1a5c19a81e2d4b4dff6730461eeb5bbb0a16dd4a8ec8637ee93"
   name = "google.golang.org/appengine"
   packages = [
     "internal",
@@ -171,11 +238,11 @@
     "urlfetch",
   ]
   pruneopts = "UT"
-  revision = "b1f26356af11148e710935ed1ac8a7f5702c7612"
-  version = "v1.1.0"
+  revision = "ae0ab99deb4dc413a2b4bd6c8bdd0eb67f1e4d06"
+  version = "v1.2.0"
 
 [[projects]]
-  digest = "1:02d2c5be9a35ce750536e74af0d98aca806f225913a3ab28f285843d6283c70d"
+  digest = "1:26a278a34e30cc8fbd09d5f7474488ac4cbad325c2b592b30e76e5d7d2fc1f10"
   name = "gopkg.in/square/go-jose.v2"
   packages = [
     ".",
@@ -183,8 +250,8 @@
     "json",
   ]
   pruneopts = "UT"
-  revision = "8254d6c783765f38c8675fae4427a1fe73fbd09d"
-  version = "v2.1.8"
+  revision = "ef984e69dd356202fd4e4910d4d9c24468bdf0b8"
+  version = "v2.1.9"
 
 [[projects]]
   digest = "1:43b8a34f6390d8fbdcfd300ed52103064e9eaaecc7e50b7e3518fe246ebe8403"
@@ -202,6 +269,8 @@
     "github.com/antihax/goesi/esi",
     "github.com/antihax/goesi/optional",
     "github.com/coreos/go-oidc",
+    "github.com/goincremental/negroni-sessions",
+    "github.com/goincremental/negroni-sessions/cookiestore",
     "github.com/gregjones/httpcache",
     "github.com/jmoiron/sqlx",
     "github.com/lib/pq",
@@ -210,7 +279,11 @@
     "github.com/twinj/uuid",
     "github.com/unrolled/secure",
     "github.com/urfave/negroni",
+    "github.com/victorspringer/http-cache",
+    "github.com/victorspringer/http-cache/adapter/memory",
     "golang.org/x/oauth2",
+    "golang.org/x/text/language",
+    "golang.org/x/text/message",
     "gopkg.in/tylerb/graceful.v1",
   ]
   solver-name = "gps-cdcl"
